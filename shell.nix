@@ -6,5 +6,6 @@
  pkgs.mkShellNoCC {
    packages = with pkgs; [
      go
+     pdfcpu
    ];
  }
