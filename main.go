@@ -62,16 +62,22 @@ func extractText(pdfPath string) (strings.Builder, error) {
 
 	defer doc.Close()
 
+	converter := md.NewConverter("", true, nil)
 	// Extract pages as images
 	for n := 0; n < doc.NumPage(); n++ {
-		stuff, err := doc.Text(n)
-		// stuff, err := doc.HTML(n, false)
+		html, err := doc.HTML(n, false)
+		if err != nil {
+			return sb, err
+		}
+
+		markdown, err := converter.ConvertString(html)
+		// TODO: Do something with the images that have been base64'd
 
 		if err != nil {
 			return sb, err
 		}
 
-		_, err = sb.WriteString(stuff)
+		_, err = sb.WriteString(markdown)
 
 		if err != nil {
 			return sb, err

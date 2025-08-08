@@ -2,10 +2,12 @@ module webscrape-to-wikijs
 
 go 1.24.4
 
-require github.com/gen2brain/go-fitz v1.24.15
+require (
+	github.com/JohannesKaufmann/html-to-markdown v1.6.0
+	github.com/gen2brain/go-fitz v1.24.15
+)
 
 require (
-	github.com/JohannesKaufmann/html-to-markdown v1.6.0 // indirect
 	github.com/PuerkitoBio/goquery v1.9.2 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
