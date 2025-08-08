@@ -2,10 +2,14 @@ module webscrape-to-wikijs
 
 go 1.24.4
 
+require github.com/gen2brain/go-fitz v1.24.15
+
 require (
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728 // indirect
-	github.com/spf13/cobra v1.8.1 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/sukeesh/markitdown-go v0.0.0-20250215023500-042867c564a8 // indirect
+	github.com/JohannesKaufmann/html-to-markdown v1.6.0 // indirect
+	github.com/PuerkitoBio/goquery v1.9.2 // indirect
+	github.com/andybalholm/cascadia v1.3.2 // indirect
+	github.com/ebitengine/purego v0.8.4 // indirect
+	github.com/jupiterrider/ffi v0.5.0 // indirect
+	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 )
