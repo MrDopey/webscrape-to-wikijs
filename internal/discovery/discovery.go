@@ -328,22 +328,25 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 	matches := linkPattern.FindAllString(string(content), -1)
 
 	// Extract file IDs from URLs
-	seenIDs := make(map[string]bool)
 	for _, urlStr := range matches {
 		id, err := extractFileID(urlStr)
 		if err != nil {
 			continue // Skip invalid URLs
 		}
 
-		// Avoid duplicates
-		if !seenIDs[id] && id != fileID { // Don't link to self
-			seenIDs[id] = true
+		// Check against global seen map to avoid re-processing
+		d.mu.Lock()
+		alreadySeen := d.seen[id]
+		d.mu.Unlock()
+
+		// Avoid duplicates and self-references
+		if !alreadySeen && id != fileID {
 			linkedIDs = append(linkedIDs, id)
 		}
 	}
 
-	if d.verbose {
-		log.Printf("Found %d linked documents in %s", len(linkedIDs), fileID)
+	if d.verbose && len(linkedIDs) > 0 {
+		log.Printf("Found %d new linked documents in %s", len(linkedIDs), fileID)
 	}
 
 	return linkedIDs
