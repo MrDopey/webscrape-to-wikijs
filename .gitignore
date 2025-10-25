@@ -43,3 +43,5 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+gdrive-crawler
