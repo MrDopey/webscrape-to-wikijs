@@ -304,7 +304,7 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 	}
 
 	// Export document as plain text to search for links
-	resp, err := d.service.Files.Export(fileID, "text/plain").Download()
+	resp, err := d.service.Files.Export(fileID, "text/markdown").Download()
 	if err != nil {
 		if d.verbose {
 			log.Printf("Warning: failed to export %s for link extraction: %v", fileID, err)
@@ -342,7 +342,7 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 		}
 	}
 
-	if d.verbose && len(linkedIDs) > 0 {
+	if d.verbose {
 		log.Printf("Found %d linked documents in %s", len(linkedIDs), fileID)
 	}
 
