@@ -174,11 +174,13 @@ You get:
 documentation/
 ├── docs/
 │   ├── guides/
-│   │   └── Quick Start.md
+│   │   └── quick-start.md
 │   └── reference/
 │       └── api/
-│           └── API Endpoints.md
+│           └── api-endpoints.md
 ```
+
+**Note**: Filenames are automatically normalized (lowercase with hyphens), while titles in frontmatter remain unchanged.
 
 ### Markdown File Format
 
@@ -197,7 +199,7 @@ title: Quick Start
 
 Your document content here...
 
-[Link to API Endpoints](../reference/api/API Endpoints.md)
+[Link to API Endpoints](../reference/api/api-endpoints.md)
 ```
 
 ## Troubleshooting

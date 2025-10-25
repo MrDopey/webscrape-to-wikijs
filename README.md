@@ -143,11 +143,13 @@ https://docs.google.com/document/d/FILE_ID/edit,API Reference,api;advanced,refer
 docs/
 ├── guides/
 │   └── tutorials/
-│       └── Getting Started.md
+│       └── getting-started.md
 └── reference/
     └── api/
-        └── API Reference.md
+        └── api-reference.md
 ```
+
+**Note**: Filenames are automatically normalized to lowercase with hyphens, while the document title in the frontmatter preserves the original formatting.
 
 **Generated Markdown File**:
 ```markdown
@@ -163,7 +165,7 @@ title: Getting Started
 
 # Getting Started
 
-[Link to API Reference](../../reference/api/API Reference.md)
+[Link to API Reference](../../reference/api/api-reference.md)
 ```
 
 ### CLI Flags
@@ -278,16 +280,19 @@ The tool tracks different file states to help you understand your documentation 
 1. Parse all Google Drive/Docs links in markdown content (supports both `drive.google.com` and `docs.google.com` URLs)
 2. Extract file IDs from URLs
 3. Look up target documents in CSV inventory
-4. Calculate relative paths using fragment hierarchy
-5. Replace absolute URLs with relative markdown links
+4. Normalize target filenames (lowercase, hyphenated)
+5. Calculate relative paths using fragment hierarchy and normalized filenames
+6. Replace absolute URLs with relative markdown links
 
 #### Path Calculation
 ```
-Source: frag1=guides, frag2=tutorials, frag3=
-Target: frag1=reference, frag2=api, frag3=
+Source: frag1=guides, frag2=tutorials, title="Getting Started"
+Target: frag1=reference, frag2=api, title="API Reference"
 
-Relative path: ../../reference/api/target.md
+Relative path: ../../reference/api/api-reference.md
 ```
+
+**Note**: Both the directory structure and target filename are normalized to lowercase with hyphens.
 
 ## CSV Column Reference
 
@@ -315,11 +320,11 @@ link,title,frag1,frag2,frag3
 output/
 ├── guides/
 │   └── getting-started/
-│       └── Doc1.md
+│       └── doc1.md
 └── reference/
     └── api/
         └── authentication/
-            └── Doc2.md
+            └── doc2.md
 ```
 
 ## Frontmatter Fields

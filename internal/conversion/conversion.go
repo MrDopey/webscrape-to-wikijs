@@ -145,8 +145,9 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 	// Combine frontmatter and content
 	finalContent := frontmatter + "\n" + contentStr
 
-	// Build output path
-	outputPath := utils.BuildOutputPath(c.outputDir, record.Title, record.GetFragments())
+	// Build output path with normalized filename
+	normalizedTitle := normalizeFilename(record.Title)
+	outputPath := utils.BuildOutputPath(c.outputDir, normalizedTitle, record.GetFragments())
 
 	// Ensure unique path
 	c.mu.Lock()
@@ -306,11 +307,12 @@ func (c *Converter) rewriteLinks(content string, sourceRecord *csv.ConversionRec
 			return match // Keep original if not in our inventory
 		}
 
-		// Calculate relative path
+		// Calculate relative path with normalized filename
+		normalizedTargetTitle := normalizeFilename(targetRecord.Title)
 		relPath := utils.CalculateRelativePath(
 			sourceRecord.GetFragments(),
 			targetRecord.GetFragments(),
-			targetRecord.Title,
+			normalizedTargetTitle,
 		)
 
 		return fmt.Sprintf("[%s](%s)", linkText, relPath)
@@ -452,6 +454,39 @@ func (c *Converter) executeDownloadWithRetry(fileID string) (io.ReadCloser, erro
 		return nil, err
 	}
 	return resp.Body, nil
+}
+
+// normalizeFilename normalizes a filename to be lowercase, hyphenated, and without special characters
+func normalizeFilename(filename string) string {
+	// Convert to lowercase
+	filename = strings.ToLower(filename)
+
+	// Replace spaces with hyphens
+	filename = strings.ReplaceAll(filename, " ", "-")
+
+	// Remove special characters, keeping only alphanumeric and hyphens
+	var sb strings.Builder
+	for _, r := range filename {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			sb.WriteRune(r)
+		}
+	}
+	filename = sb.String()
+
+	// Replace multiple consecutive hyphens with a single hyphen
+	for strings.Contains(filename, "--") {
+		filename = strings.ReplaceAll(filename, "--", "-")
+	}
+
+	// Trim hyphens from start and end
+	filename = strings.Trim(filename, "-")
+
+	// If filename is empty after normalization, use a default
+	if filename == "" {
+		filename = "unnamed"
+	}
+
+	return filename
 }
 
 // extractFileID extracts the file ID from a Google Drive URL
