@@ -44,8 +44,12 @@ func NewConverter(service *drive.Service, outputDir string, verbose, dryRun bool
 
 // Convert converts all records to markdown files
 func (c *Converter) Convert(records []csv.ConversionRecord, workers int) error {
-	// Build link map for O(1) lookup
+	// Build link map for O(1) lookup - index by both URL and file ID
 	for i := range records {
+		// Index by the exact URL from CSV
+		c.linkMap[records[i].Link] = &records[i]
+
+		// Also index by file ID for cross-format matching
 		fileID, err := extractFileID(records[i].Link)
 		if err != nil {
 			log.Printf("Warning: failed to extract file ID from %s: %v", records[i].Link, err)
@@ -295,16 +299,20 @@ func (c *Converter) rewriteLinks(content string, sourceRecord *csv.ConversionRec
 		linkText := matches[1]
 		linkURL := matches[2]
 
-		// Extract file ID from link
-		targetID, err := extractFileID(linkURL)
-		if err != nil {
-			return match // Keep original if we can't extract ID
-		}
+		// Look up target in link map by exact URL first
+		targetRecord, exists := c.linkMap[linkURL]
 
-		// Look up target in link map
-		targetRecord, exists := c.linkMap[targetID]
+		// If not found by URL, try by file ID (for cross-format matching)
 		if !exists {
-			return match // Keep original if not in our inventory
+			targetID, err := extractFileID(linkURL)
+			if err != nil {
+				return match // Keep original if we can't extract ID
+			}
+			targetRecord, exists = c.linkMap[targetID]
+			if !exists {
+				// Not in our inventory - keep original URL as-is
+				return match
+			}
 		}
 
 		// Calculate relative path with normalized filename

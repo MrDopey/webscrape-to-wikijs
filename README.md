@@ -227,6 +227,9 @@ webscrape-to-wikijs/
   - Recursively discovers linked documents up to configurable depth (default: 5)
   - Depth tracking prevents infinite recursion
   - Automatically stops when encountering non-Google Drive files
+- **URL preservation**: Original URLs are preserved during discovery
+  - Links found in documents maintain their original format (drive.google.com or docs.google.com)
+  - Folder contents generate appropriate URLs based on file type (Docs, Sheets, Slides, etc.)
 - Duplicate detection to avoid processing same files multiple times
 - Exponential backoff for rate limit handling
 - Progress logging for long-running operations with depth information
@@ -272,17 +275,26 @@ The tool tracks different file states to help you understand your documentation 
 - Concurrent document processing with worker pools
 - Native markdown export for Google Docs
 - PDF text extraction using `github.com/ledongthuc/pdf`
-- Link rewriting with relative path calculation
+- **Smart link rewriting** with relative path calculation
+  - Matches links by exact URL or file ID
+  - Enables cross-format matching (drive.google.com ↔ docs.google.com with same file ID)
+  - Converts inventory files to relative paths
 - YAML frontmatter generation
 - Directory structure creation based on fragments
 
 #### Link Rewriting Algorithm
 1. Parse all Google Drive/Docs links in markdown content (supports both `drive.google.com` and `docs.google.com` URLs)
-2. Extract file IDs from URLs
-3. Look up target documents in CSV inventory
-4. Normalize target filenames (lowercase, hyphenated)
-5. Calculate relative paths using fragment hierarchy and normalized filenames
-6. Replace absolute URLs with relative markdown links
+2. Look up target documents in CSV inventory by:
+   - First: Exact URL match
+   - Second: File ID match (enables cross-format matching)
+3. For files in inventory:
+   - Normalize target filenames (lowercase, hyphenated)
+   - Calculate relative paths using fragment hierarchy
+   - Replace with relative markdown links
+4. For files NOT in inventory:
+   - Keep original URLs as-is (both `drive.google.com` and `docs.google.com` URLs are preserved)
+
+**Cross-format matching**: If your CSV contains `docs.google.com/document/d/ABC123/edit` but the markdown links to `drive.google.com/file/d/ABC123/view`, the file ID matching will find it and convert to a relative path.
 
 #### Path Calculation
 ```
@@ -292,7 +304,10 @@ Target: frag1=reference, frag2=api, title="API Reference"
 Relative path: ../../reference/api/api-reference.md
 ```
 
-**Note**: Both the directory structure and target filename are normalized to lowercase with hyphens.
+**Note**:
+- Directory structure and target filenames are normalized to lowercase with hyphens
+- Original URLs are preserved during discovery for both `drive.google.com` and `docs.google.com`
+- Link rewriting only converts to relative paths for files in your CSV inventory
 
 ## CSV Column Reference
 
@@ -382,9 +397,13 @@ The tool handles various error scenarios gracefully:
 ### "Failed to extract file ID"
 - Verify Google Drive URL format
 - Supported formats:
-  - `https://drive.google.com/file/d/{ID}/view`
-  - `https://drive.google.com/folders/{ID}`
-  - `https://docs.google.com/document/d/{ID}/edit`
+  - **Google Docs**: `https://docs.google.com/document/d/{ID}/edit`
+  - **Google Sheets**: `https://docs.google.com/spreadsheets/d/{ID}/edit`
+  - **Google Slides**: `https://docs.google.com/presentation/d/{ID}/edit`
+  - **Google Forms**: `https://docs.google.com/forms/d/{ID}/edit`
+  - **Google Drawings**: `https://docs.google.com/drawings/d/{ID}/edit`
+  - **Folders**: `https://drive.google.com/drive/folders/{ID}`
+  - **Generic files**: `https://drive.google.com/file/d/{ID}/view`
 
 ### "Rate limited"
 - Reduce worker count with `-workers` flag

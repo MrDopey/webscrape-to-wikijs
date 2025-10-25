@@ -63,8 +63,8 @@ func (d *Discoverer) DiscoverFromURLs(urls []string) ([]csv.DiscoveryRecord, err
 			continue
 		}
 
-		// Discover from this file/folder at depth 0
-		fileRecords, err := d.discoverFromFileID(fileID, 0)
+		// Discover from this file/folder at depth 0, preserving original URL
+		fileRecords, err := d.discoverFromFileIDWithURL(fileID, urlStr, 0)
 		if err != nil {
 			log.Printf("Warning: failed to discover %s: %v", fileID, err)
 			continue
@@ -80,6 +80,11 @@ func (d *Discoverer) DiscoverFromURLs(urls []string) ([]csv.DiscoveryRecord, err
 
 // discoverFromFileID discovers a file and recursively follows links within it
 func (d *Discoverer) discoverFromFileID(fileID string, currentDepth int) ([]csv.DiscoveryRecord, error) {
+	return d.discoverFromFileIDWithURL(fileID, "", currentDepth)
+}
+
+// discoverFromFileIDWithURL discovers a file with an optional original URL and recursively follows links within it
+func (d *Discoverer) discoverFromFileIDWithURL(fileID string, originalURL string, currentDepth int) ([]csv.DiscoveryRecord, error) {
 	var records []csv.DiscoveryRecord
 
 	// Check if already seen
@@ -98,8 +103,13 @@ func (d *Discoverer) discoverFromFileID(fileID string, currentDepth int) ([]csv.
 		// Determine error type
 		status := determineErrorStatus(err)
 		log.Printf("Warning: file %s status: %s (%v)", fileID, status, err)
+		// Use original URL if available, otherwise construct one
+		link := originalURL
+		if link == "" {
+			link = buildFileLink(fileID, "")
+		}
 		return []csv.DiscoveryRecord{{
-			Link:   buildFileLink(fileID),
+			Link:   link,
 			Title:  fileID,
 			Status: status,
 		}}, nil
@@ -118,17 +128,27 @@ func (d *Discoverer) discoverFromFileID(fileID string, currentDepth int) ([]csv.
 		records = append(records, folderRecords...)
 	} else {
 		// Add this file to records
+		// Use original URL if available, otherwise construct one based on MIME type
+		link := originalURL
+		if link == "" {
+			link = buildFileLink(fileID, file.MimeType)
+		}
 		records = append(records, csv.DiscoveryRecord{
-			Link:   buildFileLink(fileID),
+			Link:   link,
 			Title:  file.Name,
 			Status: "available",
 		})
 
 		// If we haven't reached max depth, discover links within the document
 		if currentDepth < d.maxDepth {
-			linkedIDs := d.extractLinksFromDocument(fileID, file.MimeType)
-			for _, linkedID := range linkedIDs {
-				linkedRecords, err := d.discoverFromFileID(linkedID, currentDepth+1)
+			linkedURLs := d.extractLinksFromDocument(fileID, file.MimeType)
+			for _, linkedURL := range linkedURLs {
+				linkedID, err := extractFileID(linkedURL)
+				if err != nil {
+					log.Printf("Warning: failed to extract file ID from %s: %v", linkedURL, err)
+					continue
+				}
+				linkedRecords, err := d.discoverFromFileIDWithURL(linkedID, linkedURL, currentDepth+1)
 				if err != nil {
 					log.Printf("Warning: failed to discover linked file %s: %v", linkedID, err)
 					continue
@@ -200,7 +220,7 @@ func (d *Discoverer) discoverFolder(folderID string) ([]csv.DiscoveryRecord, err
 			} else {
 				// Add file record - mark as available since we successfully retrieved it
 				records = append(records, csv.DiscoveryRecord{
-					Link:   buildFileLink(file.Id),
+					Link:   buildFileLink(file.Id, file.MimeType),
 					Title:  file.Name,
 					Status: "available",
 				})
@@ -289,18 +309,18 @@ func (d *Discoverer) executeFileWithRetry(fn func() (*drive.File, error)) (*driv
 	return fn() // Final attempt
 }
 
-// extractLinksFromDocument exports a document and extracts Google Drive/Docs file IDs
+// extractLinksFromDocument exports a document and extracts Google Drive/Docs URLs
 func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string {
-	var linkedIDs []string
+	var linkedURLs []string
 
 	// Only process Google Workspace documents (not PDFs or other files)
 	if !strings.HasPrefix(mimeType, "application/vnd.google-apps.") {
-		return linkedIDs
+		return linkedURLs
 	}
 
 	// Skip folders
 	if mimeType == "application/vnd.google-apps.folder" {
-		return linkedIDs
+		return linkedURLs
 	}
 
 	// Export document as plain text to search for links
@@ -309,7 +329,7 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 		if d.verbose {
 			log.Printf("Warning: failed to export %s for link extraction: %v", fileID, err)
 		}
-		return linkedIDs
+		return linkedURLs
 	}
 	defer resp.Body.Close()
 
@@ -319,7 +339,7 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 		if d.verbose {
 			log.Printf("Warning: failed to read content of %s: %v", fileID, err)
 		}
-		return linkedIDs
+		return linkedURLs
 	}
 
 	// Find all Google Drive/Docs URLs in the content
@@ -327,7 +347,7 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 	linkPattern := regexp.MustCompile(`https://(?:drive\.google\.com|docs\.google\.com)/[^\s\)]+`)
 	matches := linkPattern.FindAllString(string(content), -1)
 
-	// Extract file IDs from URLs
+	// Process URLs and preserve them
 	for _, urlStr := range matches {
 		id, err := extractFileID(urlStr)
 		if err != nil {
@@ -341,15 +361,15 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 
 		// Avoid duplicates and self-references
 		if !alreadySeen && id != fileID {
-			linkedIDs = append(linkedIDs, id)
+			linkedURLs = append(linkedURLs, urlStr)
 		}
 	}
 
-	if d.verbose && len(linkedIDs) > 0 {
-		log.Printf("Found %d new linked documents in %s", len(linkedIDs), fileID)
+	if d.verbose && len(linkedURLs) > 0 {
+		log.Printf("Found %d new linked documents in %s", len(linkedURLs), fileID)
 	}
 
-	return linkedIDs
+	return linkedURLs
 }
 
 // extractFileID extracts the file/folder ID from a Google Drive URL
@@ -390,9 +410,25 @@ func extractFileID(urlStr string) (string, error) {
 	return "", fmt.Errorf("could not extract file ID from URL")
 }
 
-// buildFileLink constructs a Google Docs link from an ID
-func buildFileLink(fileID string) string {
-	return fmt.Sprintf("https://docs.google.com/document/d/%s/edit", fileID)
+// buildFileLink constructs an appropriate Google link from an ID and MIME type
+func buildFileLink(fileID string, mimeType string) string {
+	switch mimeType {
+	case "application/vnd.google-apps.document":
+		return fmt.Sprintf("https://docs.google.com/document/d/%s/edit", fileID)
+	case "application/vnd.google-apps.spreadsheet":
+		return fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit", fileID)
+	case "application/vnd.google-apps.presentation":
+		return fmt.Sprintf("https://docs.google.com/presentation/d/%s/edit", fileID)
+	case "application/vnd.google-apps.form":
+		return fmt.Sprintf("https://docs.google.com/forms/d/%s/edit", fileID)
+	case "application/vnd.google-apps.drawing":
+		return fmt.Sprintf("https://docs.google.com/drawings/d/%s/edit", fileID)
+	case "application/vnd.google-apps.folder":
+		return fmt.Sprintf("https://drive.google.com/drive/folders/%s", fileID)
+	default:
+		// For non-Google Workspace files (PDFs, images, etc.)
+		return fmt.Sprintf("https://drive.google.com/file/d/%s/view", fileID)
+	}
 }
 
 // determineErrorStatus determines the status based on the API error
