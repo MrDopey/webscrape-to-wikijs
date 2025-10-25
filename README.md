@@ -96,11 +96,16 @@ link,title,status
 https://drive.google.com/file/d/FILE_ID_1/view,Document Title 1,available
 https://drive.google.com/file/d/FILE_ID_2/view,Document Title 2,available
 https://drive.google.com/file/d/FILE_ID_3/view,FILE_ID_3,deleted
+https://drive.google.com/file/d/FILE_ID_4/view,FILE_ID_4,permission_denied
+https://invalid-url,INVALID_URL,invalid
 ```
 
 **Status Values**:
 - `available`: File is accessible and was successfully retrieved
-- `deleted`: File is deleted, inaccessible, or access was denied (file ID shown as title)
+- `deleted`: File ID is valid format but file doesn't exist (404 error - either deleted or never existed)
+- `permission_denied`: File exists but access is denied (403 error - need permission)
+- `invalid`: URL is malformed or file ID cannot be extracted (400 error or invalid format)
+- `error`: Other unexpected errors occurred
 
 ### Mode 2: Conversion
 
@@ -207,18 +212,41 @@ webscrape-to-wikijs/
 - Progress logging for long-running operations
 - **Deleted file tracking**: Files that are deleted or inaccessible are still indexed with status="deleted" for documentation tracking
 
-#### Deleted File Handling
-When the tool encounters a deleted or inaccessible file, it:
-1. Still adds the file to the discovery output CSV
-2. Sets the status to "deleted"
-3. Uses the file ID as the title (since the actual name is unavailable)
-4. Logs a warning message
+#### File Status Tracking
+The tool tracks different file states to help you understand your documentation inventory:
 
-This is useful for:
-- Tracking documentation that has been removed
-- Identifying broken references in your documentation
-- Maintaining a complete historical record
-- Auditing file deletions
+**Status Categories:**
+
+1. **`available`** - File is accessible and successfully retrieved
+   - Normal state for accessible files
+   - File metadata (name, type) is retrieved successfully
+
+2. **`deleted`** - File doesn't exist (HTTP 404)
+   - File ID format is valid but file is not found
+   - Could be deleted or never existed
+   - Title shows file ID since name is unavailable
+
+3. **`permission_denied`** - Access denied (HTTP 403)
+   - File exists but you don't have permission to access it
+   - Need to request access or use different credentials
+   - Title shows file ID
+
+4. **`invalid`** - Malformed URL or file ID (HTTP 400 or extraction failed)
+   - URL doesn't match Google Drive patterns
+   - File ID cannot be extracted
+   - Title shows "INVALID_URL"
+   - Link preserves original malformed URL for debugging
+
+5. **`error`** - Other unexpected errors
+   - Network issues, rate limits, or other API errors
+   - Check logs for specific error details
+
+**Use Cases:**
+- **Audit trail**: Track when files are deleted or become inaccessible
+- **Permission management**: Identify files requiring access grants
+- **Data quality**: Find malformed URLs in your input data
+- **Documentation cleanup**: Know which references are broken
+- **Historical tracking**: Maintain complete documentation inventory
 
 #### Conversion (`internal/conversion`)
 - Concurrent document processing with worker pools

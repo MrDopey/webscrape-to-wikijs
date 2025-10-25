@@ -71,8 +71,13 @@ https://drive.google.com/file/d/FILE_ID_2/view,API Reference,api,docs,reference,
 ```
 
 **Output:** `discovered-links.csv` with columns: link, title, status
-- Status is "available" for accessible files
-- Status is "deleted" for deleted/inaccessible files (file ID shown as title)
+
+**Status meanings:**
+- `available` - File accessible and retrieved successfully
+- `deleted` - File doesn't exist (404 - deleted or never existed)
+- `permission_denied` - File exists but access denied (403)
+- `invalid` - Malformed URL or file ID
+- `error` - Other unexpected errors
 
 ### Example 2: Convert to Markdown
 

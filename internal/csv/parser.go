@@ -17,7 +17,7 @@ type InputRecord struct {
 type DiscoveryRecord struct {
 	Link   string
 	Title  string
-	Status string // "available" or "deleted"
+	Status string // "available", "deleted", "invalid", or "permission_denied"
 }
 
 // ConversionRecord represents a record from the enhanced CSV for conversion mode

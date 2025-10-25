@@ -45,19 +45,29 @@ func (d *Discoverer) DiscoverFromURLs(urls []string) ([]csv.DiscoveryRecord, err
 	for _, urlStr := range urls {
 		fileID, err := extractFileID(urlStr)
 		if err != nil {
-			log.Printf("Warning: failed to extract file ID from %s: %v", urlStr, err)
+			// Invalid URL or malformed file ID - mark as invalid
+			log.Printf("Warning: invalid URL or file ID in %s: %v", urlStr, err)
+			record := csv.DiscoveryRecord{
+				Link:   urlStr,
+				Title:  "INVALID_URL",
+				Status: "invalid",
+			}
+			mu.Lock()
+			records = append(records, record)
+			mu.Unlock()
 			continue
 		}
 
 		// Check if it's a folder or file
 		file, err := d.getFileMetadata(fileID)
 		if err != nil {
-			// File is deleted or inaccessible - still index it with "deleted" status
-			log.Printf("Warning: file %s is deleted or inaccessible: %v", fileID, err)
+			// Determine error type
+			status := determineErrorStatus(err)
+			log.Printf("Warning: file %s status: %s (%v)", fileID, status, err)
 			record := csv.DiscoveryRecord{
 				Link:   buildFileLink(fileID),
 				Title:  fileID, // Use file ID as title since we can't get the name
-				Status: "deleted",
+				Status: status,
 			}
 			mu.Lock()
 			records = append(records, record)
@@ -282,4 +292,26 @@ func extractFileID(urlStr string) (string, error) {
 // buildFileLink constructs a Google Drive file link from an ID
 func buildFileLink(fileID string) string {
 	return fmt.Sprintf("https://drive.google.com/file/d/%s/view", fileID)
+}
+
+// determineErrorStatus determines the status based on the API error
+func determineErrorStatus(err error) string {
+	if apiErr, ok := err.(*googleapi.Error); ok {
+		switch apiErr.Code {
+		case 404:
+			// File not found - either deleted or never existed
+			return "deleted"
+		case 403:
+			// Permission denied - file exists but no access
+			return "permission_denied"
+		case 400:
+			// Bad request - likely invalid file ID format
+			return "invalid"
+		default:
+			// Other errors
+			return "error"
+		}
+	}
+	// Non-API errors
+	return "error"
 }
