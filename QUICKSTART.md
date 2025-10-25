@@ -70,7 +70,9 @@ https://drive.google.com/file/d/FILE_ID_2/view,API Reference,api,docs,reference,
   -verbose
 ```
 
-**Output:** `discovered-links.csv` with all found files and their links
+**Output:** `discovered-links.csv` with columns: link, title, status
+- Status is "available" for accessible files
+- Status is "deleted" for deleted/inaccessible files (file ID shown as title)
 
 ### Example 2: Convert to Markdown
 

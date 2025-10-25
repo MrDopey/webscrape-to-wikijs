@@ -18,13 +18,13 @@ func WriteDiscoveryCSV(filePath string, records []DiscoveryRecord) error {
 	defer writer.Flush()
 
 	// Write header
-	if err := writer.Write([]string{"link", "title"}); err != nil {
+	if err := writer.Write([]string{"link", "title", "status"}); err != nil {
 		return fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
 	// Write records
 	for _, record := range records {
-		if err := writer.Write([]string{record.Link, record.Title}); err != nil {
+		if err := writer.Write([]string{record.Link, record.Title, record.Status}); err != nil {
 			return fmt.Errorf("failed to write CSV row: %w", err)
 		}
 	}

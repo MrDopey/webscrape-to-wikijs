@@ -5,6 +5,7 @@ A comprehensive Go-based CLI tool for crawling Google Drive folders and converti
 ## Features
 
 - **Discovery Mode**: Recursively crawl Google Drive folders and extract all document links with titles
+- **Deleted File Tracking**: Automatically indexes deleted/inaccessible files with "deleted" status for documentation tracking
 - **Conversion Mode**: Convert Google Drive documents to markdown with intelligent link rewriting and frontmatter
 - **Multiple File Types**: Supports Google Docs (native markdown export) and PDFs (text extraction)
 - **Smart Link Rewriting**: Automatically converts absolute Google Drive links to relative markdown paths
@@ -91,10 +92,15 @@ https://drive.google.com/file/d/YOUR_FILE_ID/view
 
 **Output CSV Format** (`links.csv`):
 ```csv
-link,title
-https://drive.google.com/file/d/FILE_ID_1/view,Document Title 1
-https://drive.google.com/file/d/FILE_ID_2/view,Document Title 2
+link,title,status
+https://drive.google.com/file/d/FILE_ID_1/view,Document Title 1,available
+https://drive.google.com/file/d/FILE_ID_2/view,Document Title 2,available
+https://drive.google.com/file/d/FILE_ID_3/view,FILE_ID_3,deleted
 ```
+
+**Status Values**:
+- `available`: File is accessible and was successfully retrieved
+- `deleted`: File is deleted, inaccessible, or access was denied (file ID shown as title)
 
 ### Mode 2: Conversion
 
@@ -199,6 +205,20 @@ webscrape-to-wikijs/
 - Duplicate detection to avoid processing same files multiple times
 - Exponential backoff for rate limit handling
 - Progress logging for long-running operations
+- **Deleted file tracking**: Files that are deleted or inaccessible are still indexed with status="deleted" for documentation tracking
+
+#### Deleted File Handling
+When the tool encounters a deleted or inaccessible file, it:
+1. Still adds the file to the discovery output CSV
+2. Sets the status to "deleted"
+3. Uses the file ID as the title (since the actual name is unavailable)
+4. Logs a warning message
+
+This is useful for:
+- Tracking documentation that has been removed
+- Identifying broken references in your documentation
+- Maintaining a complete historical record
+- Auditing file deletions
 
 #### Conversion (`internal/conversion`)
 - Concurrent document processing with worker pools

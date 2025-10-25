@@ -15,8 +15,9 @@ type InputRecord struct {
 
 // DiscoveryRecord represents a record for discovery output
 type DiscoveryRecord struct {
-	Link  string
-	Title string
+	Link   string
+	Title  string
+	Status string // "available" or "deleted"
 }
 
 // ConversionRecord represents a record from the enhanced CSV for conversion mode

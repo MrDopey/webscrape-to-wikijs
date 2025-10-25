@@ -52,7 +52,16 @@ func (d *Discoverer) DiscoverFromURLs(urls []string) ([]csv.DiscoveryRecord, err
 		// Check if it's a folder or file
 		file, err := d.getFileMetadata(fileID)
 		if err != nil {
-			log.Printf("Warning: failed to get metadata for %s: %v", fileID, err)
+			// File is deleted or inaccessible - still index it with "deleted" status
+			log.Printf("Warning: file %s is deleted or inaccessible: %v", fileID, err)
+			record := csv.DiscoveryRecord{
+				Link:   buildFileLink(fileID),
+				Title:  fileID, // Use file ID as title since we can't get the name
+				Status: "deleted",
+			}
+			mu.Lock()
+			records = append(records, record)
+			mu.Unlock()
 			continue
 		}
 
@@ -71,10 +80,11 @@ func (d *Discoverer) DiscoverFromURLs(urls []string) ([]csv.DiscoveryRecord, err
 			records = append(records, folderRecords...)
 			mu.Unlock()
 		} else {
-			// Single file
+			// Single file - mark as available
 			record := csv.DiscoveryRecord{
-				Link:  buildFileLink(fileID),
-				Title: file.Name,
+				Link:   buildFileLink(fileID),
+				Title:  file.Name,
+				Status: "available",
 			}
 			mu.Lock()
 			records = append(records, record)
@@ -140,10 +150,11 @@ func (d *Discoverer) discoverFolder(folderID string) ([]csv.DiscoveryRecord, err
 				}
 				records = append(records, subRecords...)
 			} else {
-				// Add file record
+				// Add file record - mark as available since we successfully retrieved it
 				records = append(records, csv.DiscoveryRecord{
-					Link:  buildFileLink(file.Id),
-					Title: file.Name,
+					Link:   buildFileLink(file.Id),
+					Title:  file.Name,
+					Status: "available",
 				})
 			}
 		}
