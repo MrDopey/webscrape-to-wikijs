@@ -392,7 +392,7 @@ func (d *Discoverer) extractLinksFromPDF(fileID string) ([]byte, error) {
 	// Create a copy of the PDF as a Google Doc
 	// This mimics the "Open with Google Docs" behavior in the UI
 	copyFile := &drive.File{
-		Name:     "dev/temp/temp_link_extraction_" + fileID,
+		Name:     "temp_link_extraction_" + fileID,
 		MimeType: "application/vnd.google-apps.document",
 	}
 

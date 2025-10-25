@@ -21,13 +21,13 @@ import (
 
 // Converter handles conversion of Google Drive documents to markdown
 type Converter struct {
-	service      *drive.Service
-	outputDir    string
-	verbose      bool
-	dryRun       bool
-	linkMap      map[string]*csv.ConversionRecord // Maps file ID to record
+	service       *drive.Service
+	outputDir     string
+	verbose       bool
+	dryRun        bool
+	linkMap       map[string]*csv.ConversionRecord // Maps file ID to record
 	existingPaths map[string]bool
-	mu           sync.Mutex
+	mu            sync.Mutex
 }
 
 // NewConverter creates a new Converter
@@ -214,7 +214,8 @@ func (c *Converter) convertPDFViaGoogleDocs(fileID string, modifiedTime string) 
 	// Create a copy of the PDF as a Google Doc
 	// This mimics the "Open with Google Docs" behavior in the UI
 	copyFile := &drive.File{
-		Name:     "dev/temp/temp_conversion_" + fileID,
+		Parents:  []string{"dev", "temp"},
+		Name:     "temp_conversion_" + fileID,
 		MimeType: "application/vnd.google-apps.document",
 	}
 

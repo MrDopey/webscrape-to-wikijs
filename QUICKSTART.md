@@ -41,16 +41,16 @@ sudo mv gdrive-crawler /usr/local/bin/
 **For OAuth2:**
 
 1. Create OAuth2 credentials in Google Cloud Console
-2. Download client credentials JSON
-3. The tool will prompt for authorization on first run
-   - **Default scope**: `drive.file` (automatically used - allows PDF processing)
-   - This scope only allows the app to create/manage its own temporary files
-   - Does NOT grant access to your existing Drive files
+2. Configure OAuth consent screen with `https://www.googleapis.com/auth/drive` scope
+3. Download client credentials JSON
+4. The tool will prompt for authorization on first run
+   - **Default scope**: `drive` (full Drive access - automatically used)
+   - Required to read existing files and create temporary files for PDF conversion
 
 **Note**:
-- The tool now uses `drive.file` scope by default for PDF support
-- If you previously authenticated with read-only permissions, delete your stored token and re-authenticate
-- Temporary files are created in a `dev/temp/` folder in your Drive root
+- The tool uses full Drive scope by default (`https://www.googleapis.com/auth/drive`)
+- If you previously authenticated with different permissions, delete your stored token and re-authenticate
+- Temporary files are created in your Drive root and automatically deleted after processing
 - See [PDF Processing Requirements](README.md#pdf-processing-requirements) for details
 
 ### 2. Create Input CSV
@@ -232,9 +232,9 @@ Your document content here...
 - Check Google Cloud Console quotas
 
 ### "Failed to convert PDF" or permission errors
-- **Cause**: Insufficient write permissions for PDF conversion
+- **Cause**: Insufficient permissions for PDF conversion
 - **Service Account Fix**: Share folders with "Editor" permissions (IAM role doesn't matter)
-- **OAuth2 Fix**: Use `drive.file` scope and re-authenticate
+- **OAuth2 Fix**: Delete stored token and re-authenticate (tool uses full Drive scope by default)
 - **Alternative**: Tool will automatically fall back to basic text extraction (lower quality)
 
 ### "Unsupported file type"

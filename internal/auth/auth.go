@@ -27,8 +27,8 @@ func NewDriveService(ctx context.Context, credentialsPath string) (*DriveService
 	}
 
 	// Try service account first
-	// Use DriveFileScope to allow creating temporary files for PDF conversion
-	config, err := google.JWTConfigFromJSON(credBytes, drive.DriveFileScope)
+	// Use DriveScope to allow reading existing files, metadata, and creating temporary files for PDF conversion
+	config, err := google.JWTConfigFromJSON(credBytes, drive.DriveScope)
 	if err == nil {
 		// Service account authentication
 		client := config.Client(ctx)
@@ -64,7 +64,7 @@ func NewDriveService(ctx context.Context, credentialsPath string) (*DriveService
 			ClientID:     creds.Installed.ClientID,
 			ClientSecret: creds.Installed.ClientSecret,
 			RedirectURL:  "urn:ietf:wg:oauth:2.0:oob",
-			Scopes:       []string{drive.DriveFileScope}, // Allows creating temp files for PDF conversion
+			Scopes:       []string{drive.DriveScope}, // Full Drive access: read existing files + create temp files for PDF conversion
 			Endpoint:     google.Endpoint,
 		}
 	} else if creds.Web.ClientID != "" {
@@ -72,7 +72,7 @@ func NewDriveService(ctx context.Context, credentialsPath string) (*DriveService
 			ClientID:     creds.Web.ClientID,
 			ClientSecret: creds.Web.ClientSecret,
 			RedirectURL:  creds.Web.RedirectURIs[0],
-			Scopes:       []string{drive.DriveFileScope}, // Allows creating temp files for PDF conversion
+			Scopes:       []string{drive.DriveScope}, // Full Drive access: read existing files + create temp files for PDF conversion
 			Endpoint:     google.Endpoint,
 		}
 	} else {

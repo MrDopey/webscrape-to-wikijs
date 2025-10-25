@@ -71,17 +71,13 @@ go build -o gdrive-crawler ./cmd/gdrive-crawler
 1. Go to "APIs & Services" > "Credentials"
 2. Click "Create Credentials" > "OAuth client ID"
 3. Configure the OAuth consent screen if prompted
-4. Add OAuth scopes based on your needs:
-   - **For Google Docs only**: `https://www.googleapis.com/auth/drive.readonly`
-   - **For PDF processing**: `https://www.googleapis.com/auth/drive.file` (minimum scope - only allows creating/deleting files the app creates)
-   - **Alternative for PDFs**: `https://www.googleapis.com/auth/drive` (full access - not recommended unless needed for other reasons)
+4. Add OAuth scope:
+   - `https://www.googleapis.com/auth/drive` (full Drive access - required to read existing files and create temporary files for PDF conversion)
 5. Select "Desktop app" as the application type
 6. Download the credentials JSON file
 7. Save it as `credentials.json`
 
-**Recommended Scope**: Use `drive.file` for PDF support - it's the most restrictive scope that allows temporary file creation without accessing your existing files.
-
-**Important**: The tool now uses `drive.file` scope by default. If you previously authenticated with read-only permissions, you need to re-authenticate:
+**Important**: The tool uses full Drive scope (`drive`) by default. If you previously authenticated with different permissions, you need to re-authenticate:
 1. Delete your stored OAuth token (usually in `~/.credentials/` or similar)
 2. Run the tool again - it will prompt you to authorize with the new scope
 
@@ -96,9 +92,9 @@ When processing PDFs, the tool:
 2. Exports the converted document as markdown
 3. Automatically deletes the temporary file after processing
 
-**Temporary files are named**: `dev/temp/temp_conversion_{fileID}` or `dev/temp/temp_link_extraction_{fileID}`
+**Temporary files are named**: `temp_conversion_{fileID}` or `temp_link_extraction_{fileID}`
 
-**Note**: Temporary files are placed in a `dev/temp/` folder structure in your Drive root to keep them organized.
+**Note**: Temporary files are created in your Drive root and automatically deleted after processing.
 
 ### Minimum Permission Requirements
 
@@ -109,12 +105,11 @@ When processing PDFs, the tool:
   - Alternative: "Content Manager" also works but is rarely used
 
 **OAuth2:**
-- **Default Scope**: `https://www.googleapis.com/auth/drive.file` (automatically used by the tool)
-  - Only allows creating/reading/deleting files the app creates
-  - Most secure option for PDF processing
-  - Does NOT grant access to your existing Drive files
+- **Required Scope**: `https://www.googleapis.com/auth/drive` (automatically used by the tool)
+  - Full Drive access - allows reading existing files and creating temporary files
+  - Required to read PDFs and Google Docs from your Drive
+  - Required to create temporary files for PDF conversion
   - No configuration needed - this scope is used by default
-- **Alternative**: `https://www.googleapis.com/auth/drive` (full access - not recommended, requires code changes)
 
 **Without Write Access:**
 - PDF conversion will fail and fall back to basic text extraction (lower quality)
@@ -481,8 +476,8 @@ The tool handles various error scenarios gracefully:
 - **Service Account Solution**:
   - Re-share Drive folders with "Editor" permissions (not "Viewer") to the service account email
   - Note: IAM role in Cloud Console doesn't matter - only folder sharing permissions matter
-- **OAuth2 Solution** (if you previously used an older version with read-only scope):
-  - The tool now uses `drive.file` scope by default (no code changes needed)
+- **OAuth2 Solution** (if you previously used an older version with different scope):
+  - The tool now uses full Drive scope (`drive`) by default (no code changes needed)
   - Delete stored OAuth token and re-authenticate:
     - Look for token in `~/.credentials/`, `token.json`, or similar files
     - Run the tool again - it will prompt for authorization with the new scope
