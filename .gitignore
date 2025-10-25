@@ -1,5 +1,6 @@
 # Binaries
 gdrive-crawler
+!cmd/gdrive-crawler
 webscrape-to-wikijs
 *.exe
 *.dll
@@ -44,4 +45,3 @@ tmp/
 temp/
 *.tmp
 
-gdrive-crawler
