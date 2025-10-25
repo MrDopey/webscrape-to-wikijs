@@ -104,15 +104,15 @@ https://docs.google.com/document/d/YOUR_FILE_ID/edit
 **Output CSV Format** (`links.csv`):
 ```csv
 link,title,status
-https://docs.google.com/document/d/FILE_ID_1/edit,Document Title 1,available
-https://docs.google.com/document/d/FILE_ID_2/edit,Document Title 2,available
+https://docs.google.com/document/d/FILE_ID_1/edit,Document Title 1,
+https://docs.google.com/document/d/FILE_ID_2/edit,Document Title 2,
 https://docs.google.com/document/d/FILE_ID_3/edit,FILE_ID_3,deleted
 https://docs.google.com/document/d/FILE_ID_4/edit,FILE_ID_4,permission_denied
 https://invalid-url,INVALID_URL,invalid
 ```
 
 **Status Values**:
-- `available`: File is accessible and was successfully retrieved
+- *Empty* (`""`) : File is accessible and was successfully retrieved (default/normal state)
 - `deleted`: File ID is valid format but file doesn't exist (404 error - either deleted or never existed)
 - `permission_denied`: File exists but access is denied (403 error - need permission)
 - `invalid`: URL is malformed or file ID cannot be extracted (400 error or invalid format)

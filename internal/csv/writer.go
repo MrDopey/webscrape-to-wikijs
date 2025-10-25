@@ -24,7 +24,12 @@ func WriteDiscoveryCSV(filePath string, records []DiscoveryRecord) error {
 
 	// Write records
 	for _, record := range records {
-		if err := writer.Write([]string{record.Link, record.Title, record.Status}); err != nil {
+		// Only write status if it's not "available" (available files have empty status)
+		status := record.Status
+		if status == "available" {
+			status = ""
+		}
+		if err := writer.Write([]string{record.Link, record.Title, status}); err != nil {
 			return fmt.Errorf("failed to write CSV row: %w", err)
 		}
 	}
