@@ -53,8 +53,8 @@ https://drive.google.com/drive/folders/YOUR_FOLDER_ID
 **For Conversion Mode** (`enhanced-links.csv`):
 ```csv
 link,title,tags,frag1,frag2,frag3,frag4,frag5
-https://drive.google.com/file/d/FILE_ID_1/view,Getting Started,tutorial,docs,guides,,,
-https://drive.google.com/file/d/FILE_ID_2/view,API Reference,api,docs,reference,,,
+https://docs.google.com/document/d/FILE_ID_1/edit,Getting Started,tutorial,docs,guides,,,
+https://docs.google.com/document/d/FILE_ID_2/edit,API Reference,api,docs,reference,,,
 ```
 
 ## Usage Examples

@@ -279,10 +279,11 @@ func convertPDFToMarkdown(pdfPath string) ([]byte, error) {
 	return []byte(sb.String()), nil
 }
 
-// rewriteLinks rewrites Google Drive links to relative paths
+// rewriteLinks rewrites Google Drive/Docs links to relative paths
 func (c *Converter) rewriteLinks(content string, sourceRecord *csv.ConversionRecord) string {
-	// Pattern to match Google Drive links
-	linkPattern := regexp.MustCompile(`\[([^\]]+)\]\((https://drive\.google\.com/[^\)]+)\)`)
+	// Pattern to match Google Drive and Google Docs links
+	// Using non-capturing group (?:...) for domain alternation
+	linkPattern := regexp.MustCompile(`\[([^\]]+)\]\((https://(?:drive\.google\.com|docs\.google\.com)/[^\)]+)\)`)
 
 	return linkPattern.ReplaceAllStringFunc(content, func(match string) string {
 		matches := linkPattern.FindStringSubmatch(match)

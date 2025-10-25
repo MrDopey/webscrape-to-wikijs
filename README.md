@@ -87,16 +87,16 @@ Discover all files in Google Drive folders and output a CSV with links and title
 ```csv
 url
 https://drive.google.com/drive/folders/YOUR_FOLDER_ID
-https://drive.google.com/file/d/YOUR_FILE_ID/view
+https://docs.google.com/document/d/YOUR_FILE_ID/edit
 ```
 
 **Output CSV Format** (`links.csv`):
 ```csv
 link,title,status
-https://drive.google.com/file/d/FILE_ID_1/view,Document Title 1,available
-https://drive.google.com/file/d/FILE_ID_2/view,Document Title 2,available
-https://drive.google.com/file/d/FILE_ID_3/view,FILE_ID_3,deleted
-https://drive.google.com/file/d/FILE_ID_4/view,FILE_ID_4,permission_denied
+https://docs.google.com/document/d/FILE_ID_1/edit,Document Title 1,available
+https://docs.google.com/document/d/FILE_ID_2/edit,Document Title 2,available
+https://docs.google.com/document/d/FILE_ID_3/edit,FILE_ID_3,deleted
+https://docs.google.com/document/d/FILE_ID_4/edit,FILE_ID_4,permission_denied
 https://invalid-url,INVALID_URL,invalid
 ```
 
@@ -123,8 +123,8 @@ Convert Google Drive documents to markdown with hierarchical organization.
 **Input CSV Format** (`enhanced-links.csv`):
 ```csv
 link,title,tags,frag1,frag2,frag3,frag4,frag5
-https://drive.google.com/file/d/FILE_ID/view,Getting Started,tutorial;beginner,guides,tutorials,,,
-https://drive.google.com/file/d/FILE_ID/view,API Reference,api;advanced,reference,api,,,
+https://docs.google.com/document/d/FILE_ID/edit,Getting Started,tutorial;beginner,guides,tutorials,,,
+https://docs.google.com/document/d/FILE_ID/edit,API Reference,api;advanced,reference,api,,,
 ```
 
 **Output Structure**:
@@ -257,7 +257,7 @@ The tool tracks different file states to help you understand your documentation 
 - Directory structure creation based on fragments
 
 #### Link Rewriting Algorithm
-1. Parse all Google Drive links in markdown content
+1. Parse all Google Drive/Docs links in markdown content (supports both `drive.google.com` and `docs.google.com` URLs)
 2. Extract file IDs from URLs
 3. Look up target documents in CSV inventory
 4. Calculate relative paths using fragment hierarchy

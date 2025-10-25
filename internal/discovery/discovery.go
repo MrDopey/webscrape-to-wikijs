@@ -289,9 +289,9 @@ func extractFileID(urlStr string) (string, error) {
 	return "", fmt.Errorf("could not extract file ID from URL")
 }
 
-// buildFileLink constructs a Google Drive file link from an ID
+// buildFileLink constructs a Google Docs link from an ID
 func buildFileLink(fileID string) string {
-	return fmt.Sprintf("https://drive.google.com/file/d/%s/view", fileID)
+	return fmt.Sprintf("https://docs.google.com/document/d/%s/edit", fileID)
 }
 
 // determineErrorStatus determines the status based on the API error
