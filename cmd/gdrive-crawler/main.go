@@ -84,7 +84,7 @@ func runDiscover() {
 	fs := flag.NewFlagSet("discover", flag.ExitOnError)
 	input := fs.String("input", "", "Input CSV file with Google Drive URLs (required)")
 	output := fs.String("output", "", "Output CSV file path (required)")
-	credentials := fs.String("credentials", "", "Google API credentials JSON file (required)")
+	credentials := fs.String("credentials", "credentials.json", "Google API credentials JSON file (required)")
 	depth := fs.Int("depth", 5, "Maximum depth for recursive link discovery (default: 5)")
 	verbose := fs.Bool("verbose", false, "Enable verbose logging")
 
@@ -154,7 +154,7 @@ func runConvert() {
 	fs := flag.NewFlagSet("convert", flag.ExitOnError)
 	input := fs.String("input", "", "Input CSV file (required)")
 	output := fs.String("output", "./output", "Output directory path")
-	credentials := fs.String("credentials", "", "Google API credentials JSON file (required)")
+	credentials := fs.String("credentials", "credentials.json", "Google API credentials JSON file (required)")
 	workers := fs.Int("workers", 5, "Number of concurrent workers")
 	verbose := fs.Bool("verbose", false, "Enable verbose logging")
 	dryRun := fs.Bool("dry-run", false, "Preview actions without writing files")
