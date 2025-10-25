@@ -1,4 +1,45 @@
+# Binaries
+gdrive-crawler
 webscrape-to-wikijs
+*.exe
+*.dll
+*.so
+*.dylib
 
+# Test binary
+*.test
+
+# Output directories
+output/
+docs/
+documentation/
 inputs/
 outputs/
+
+# Credentials
+credentials.json
+service-account.json
+*.json.key
+
+# CSV files (examples are tracked)
+/*.csv
+!examples/*.csv
+
+# Go
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
