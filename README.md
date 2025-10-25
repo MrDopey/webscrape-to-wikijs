@@ -5,10 +5,10 @@ A comprehensive Go-based CLI tool for crawling Google Drive folders and converti
 ## Features
 
 - **Discovery Mode**: Recursively crawl Google Drive folders and extract all document links with titles
-- **Link Discovery**: Automatically follows links within documents to discover referenced files (configurable depth)
+- **Link Discovery**: Automatically follows links within documents (including PDFs) to discover referenced files (configurable depth)
 - **Deleted File Tracking**: Automatically indexes deleted/inaccessible files with "deleted" status for documentation tracking
 - **Conversion Mode**: Convert Google Drive documents to markdown with intelligent link rewriting and frontmatter
-- **Multiple File Types**: Supports Google Docs (native markdown export) and PDFs (text extraction)
+- **Multiple File Types**: Supports Google Docs (native markdown export) and PDFs (Google Docs conversion + fallback text extraction)
 - **Smart Link Rewriting**: Automatically converts absolute Google Drive links to relative markdown paths
 - **Hierarchical Organization**: Creates nested directory structures based on fragment columns
 - **YAML Frontmatter**: Generates metadata including hashes, tags, and publication status
@@ -23,6 +23,7 @@ A comprehensive Go-based CLI tool for crawling Google Drive folders and converti
 - Go 1.21 or higher
 - Google Cloud Project with Drive API enabled
 - Service account credentials or OAuth2 credentials
+- **For PDF processing**: Write access to Google Drive (required to create temporary files during PDF conversion)
 
 ### Build from Source
 
@@ -51,7 +52,8 @@ go build -o gdrive-crawler ./cmd/gdrive-crawler
 2. Click "Create Credentials" > "Service Account"
 3. Fill in the service account details
 4. Click "Create and Continue"
-5. Grant the service account the "Viewer" role
+5. **Skip the IAM role selection** (or select any role - IAM roles don't control Drive access)
+   - Drive access is controlled by folder sharing permissions (next step)
 6. Click "Done"
 7. Click on the created service account
 8. Go to the "Keys" tab
@@ -59,16 +61,74 @@ go build -o gdrive-crawler ./cmd/gdrive-crawler
 10. Select "JSON" format
 11. Save the downloaded JSON file as `credentials.json`
 
-**Important**: Share your Google Drive folders with the service account email address (found in the JSON file) to grant access.
+**Important - Drive Folder Sharing** (this controls actual access):
+- Share your Google Drive folders with the service account email address (found in the JSON file)
+- **For Google Docs only**: Share with "Viewer" permissions
+- **For PDF processing**: Share with "Editor" permissions (minimum required to create and delete temporary files)
 
 #### Option B: OAuth2 (For personal use)
 
 1. Go to "APIs & Services" > "Credentials"
 2. Click "Create Credentials" > "OAuth client ID"
 3. Configure the OAuth consent screen if prompted
-4. Select "Desktop app" as the application type
-5. Download the credentials JSON file
-6. Save it as `credentials.json`
+4. Add OAuth scopes based on your needs:
+   - **For Google Docs only**: `https://www.googleapis.com/auth/drive.readonly`
+   - **For PDF processing**: `https://www.googleapis.com/auth/drive.file` (minimum scope - only allows creating/deleting files the app creates)
+   - **Alternative for PDFs**: `https://www.googleapis.com/auth/drive` (full access - not recommended unless needed for other reasons)
+5. Select "Desktop app" as the application type
+6. Download the credentials JSON file
+7. Save it as `credentials.json`
+
+**Recommended Scope**: Use `drive.file` for PDF support - it's the most restrictive scope that allows temporary file creation without accessing your existing files.
+
+**Important**: The tool now uses `drive.file` scope by default. If you previously authenticated with read-only permissions, you need to re-authenticate:
+1. Delete your stored OAuth token (usually in `~/.credentials/` or similar)
+2. Run the tool again - it will prompt you to authorize with the new scope
+
+## PDF Processing Requirements
+
+The tool uses Google Drive's "Open with Google Docs" conversion feature to process PDFs, which provides significantly better conversion quality than direct text extraction. This requires **write access** to Google Drive to create temporary files.
+
+### Why Write Access is Needed
+
+When processing PDFs, the tool:
+1. Creates a temporary Google Doc copy of the PDF (like clicking "Open with Google Docs" in the UI)
+2. Exports the converted document as markdown
+3. Automatically deletes the temporary file after processing
+
+**Temporary files are named**: `dev/temp/temp_conversion_{fileID}` or `dev/temp/temp_link_extraction_{fileID}`
+
+**Note**: Temporary files are placed in a `dev/temp/` folder structure in your Drive root to keep them organized.
+
+### Minimum Permission Requirements
+
+**Service Account:**
+- **IAM Role**: Any role or none (IAM doesn't control Drive access)
+- **Drive Folder Sharing**: "Editor" permission on shared folders
+  - This is the minimum level that allows creating and deleting files
+  - Alternative: "Content Manager" also works but is rarely used
+
+**OAuth2:**
+- **Default Scope**: `https://www.googleapis.com/auth/drive.file` (automatically used by the tool)
+  - Only allows creating/reading/deleting files the app creates
+  - Most secure option for PDF processing
+  - Does NOT grant access to your existing Drive files
+  - No configuration needed - this scope is used by default
+- **Alternative**: `https://www.googleapis.com/auth/drive` (full access - not recommended, requires code changes)
+
+**Without Write Access:**
+- PDF conversion will fail and fall back to basic text extraction (lower quality)
+- Discovery mode will skip link extraction from PDFs
+- Google Docs will continue to work normally with just read permissions
+
+### Privacy & Security
+
+The tool:
+- ✅ Only creates temporary files during active processing
+- ✅ Automatically deletes all temporary files after conversion
+- ✅ Does not modify or access your original files
+- ✅ Temporary files are only visible to the service account/OAuth user
+- ❌ Does not leave any permanent files in your Drive
 
 ## Usage
 
@@ -222,11 +282,13 @@ webscrape-to-wikijs/
 #### Discovery (`internal/discovery`)
 - Recursive folder traversal using Google Drive API
 - **Recursive link discovery**: Crawls document contents to find and follow links to other Google Drive files
-  - Exports documents as plain text to extract URLs
+  - Exports Google Docs as markdown to extract URLs
+  - **PDF support**: Converts PDFs to Google Docs format temporarily for link extraction
   - Searches for Google Drive/Docs links within content
   - Recursively discovers linked documents up to configurable depth (default: 5)
   - Depth tracking prevents infinite recursion
   - Automatically stops when encountering non-Google Drive files
+  - Automatically cleans up temporary conversion files
 - **URL preservation**: Original URLs are preserved during discovery
   - Links found in documents maintain their original format (drive.google.com or docs.google.com)
   - Folder contents generate appropriate URLs based on file type (Docs, Sheets, Slides, etc.)
@@ -274,7 +336,11 @@ The tool tracks different file states to help you understand your documentation 
 #### Conversion (`internal/conversion`)
 - Concurrent document processing with worker pools
 - Native markdown export for Google Docs
-- PDF text extraction using `github.com/ledongthuc/pdf`
+- **Smart PDF conversion**: Uses Google Drive's "Open with Google Docs" conversion
+  - Creates temporary Google Doc copy of PDF for better conversion quality
+  - Exports as markdown using native Google Docs export
+  - Falls back to direct text extraction using `github.com/ledongthuc/pdf` if conversion fails
+  - Automatically cleans up temporary files
 - **Smart link rewriting** with relative path calculation
   - Matches links by exact URL or file ID
   - Enables cross-format matching (drive.google.com ↔ docs.google.com with same file ID)
@@ -410,8 +476,22 @@ The tool handles various error scenarios gracefully:
 - Wait a few minutes before retrying
 - Check Google Cloud Console quotas
 
+### "Failed to convert PDF" or "Permission denied" on PDFs
+- **Cause**: Insufficient permissions to create temporary files for PDF conversion
+- **Service Account Solution**:
+  - Re-share Drive folders with "Editor" permissions (not "Viewer") to the service account email
+  - Note: IAM role in Cloud Console doesn't matter - only folder sharing permissions matter
+- **OAuth2 Solution** (if you previously used an older version with read-only scope):
+  - The tool now uses `drive.file` scope by default (no code changes needed)
+  - Delete stored OAuth token and re-authenticate:
+    - Look for token in `~/.credentials/`, `token.json`, or similar files
+    - Run the tool again - it will prompt for authorization with the new scope
+- **Workaround**: The tool will automatically fall back to basic text extraction (lower quality) if conversion fails
+
 ### "Unsupported file type"
-- Currently supported: Google Docs, PDFs
+- Currently supported:
+  - Google Docs (native markdown export)
+  - PDFs (converted via Google Docs for better quality)
 - Other Google Workspace types (Sheets, Slides) require export format specification
 
 ## Development

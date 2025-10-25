@@ -130,8 +130,8 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 			return fmt.Errorf("failed to export %s as markdown: %w", record.Title, err)
 		}
 	} else if file.MimeType == "application/pdf" {
-		// PDF - download and convert
-		content, revisionHash, err = c.convertPDF(fileID)
+		// PDF - convert to Google Docs format (like "Open with Google Docs" in UI)
+		content, revisionHash, err = c.convertPDFViaGoogleDocs(fileID, file.ModifiedTime)
 		if err != nil {
 			return fmt.Errorf("failed to convert PDF %s: %w", record.Title, err)
 		}
@@ -205,7 +205,57 @@ func (c *Converter) exportAsMarkdown(fileID string) ([]byte, string, error) {
 	return content, file.ModifiedTime, nil
 }
 
-// convertPDF downloads a PDF and converts it to markdown using markitdown-go
+// convertPDFViaGoogleDocs converts a PDF to markdown by creating a Google Docs copy
+func (c *Converter) convertPDFViaGoogleDocs(fileID string, modifiedTime string) ([]byte, string, error) {
+	if c.verbose {
+		log.Printf("Converting PDF %s using Google Docs conversion...", fileID)
+	}
+
+	// Create a copy of the PDF as a Google Doc
+	// This mimics the "Open with Google Docs" behavior in the UI
+	copyFile := &drive.File{
+		Name:     "dev/temp/temp_conversion_" + fileID,
+		MimeType: "application/vnd.google-apps.document",
+	}
+
+	copiedFile, err := c.service.Files.Copy(fileID, copyFile).Do()
+	if err != nil {
+		if c.verbose {
+			log.Printf("Warning: Failed to convert PDF %s using Google Docs, falling back to text extraction: %v", fileID, err)
+		}
+		// Fall back to direct PDF text extraction
+		return c.convertPDF(fileID)
+	}
+
+	// Delete the temporary converted file when done
+	defer func() {
+		if err := c.service.Files.Delete(copiedFile.Id).Do(); err != nil {
+			if c.verbose {
+				log.Printf("Warning: Failed to delete temporary file %s: %v", copiedFile.Id, err)
+			}
+		}
+	}()
+
+	// Export the converted Google Doc as markdown
+	body, err := c.executeExportWithRetry(copiedFile.Id, "text/markdown")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to export converted document: %w", err)
+	}
+	defer body.Close()
+
+	content, err := io.ReadAll(body)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read converted content: %w", err)
+	}
+
+	if c.verbose {
+		log.Printf("Successfully converted PDF %s using Google Docs", fileID)
+	}
+
+	return content, modifiedTime, nil
+}
+
+// convertPDF downloads a PDF and converts it to markdown using direct text extraction (fallback)
 func (c *Converter) convertPDF(fileID string) ([]byte, string, error) {
 	// Get revision hash
 	file, err := c.getFileMetadata(fileID)

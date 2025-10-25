@@ -32,15 +32,26 @@ sudo mv gdrive-crawler /usr/local/bin/
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create/select a project
 3. Enable Google Drive API
-4. Create Service Account
+4. Create Service Account (skip IAM role - it doesn't affect Drive access)
 5. Download JSON credentials
-6. Share your Drive folders with the service account email
+6. Share your Drive folders with the service account email:
+   - **"Editor" permissions** - Required for PDF processing (minimum to create/delete temp files)
+   - **"Viewer" permissions** - Sufficient for Google Docs only
 
 **For OAuth2:**
 
 1. Create OAuth2 credentials in Google Cloud Console
 2. Download client credentials JSON
 3. The tool will prompt for authorization on first run
+   - **Default scope**: `drive.file` (automatically used - allows PDF processing)
+   - This scope only allows the app to create/manage its own temporary files
+   - Does NOT grant access to your existing Drive files
+
+**Note**:
+- The tool now uses `drive.file` scope by default for PDF support
+- If you previously authenticated with read-only permissions, delete your stored token and re-authenticate
+- Temporary files are created in a `dev/temp/` folder in your Drive root
+- See [PDF Processing Requirements](README.md#pdf-processing-requirements) for details
 
 ### 2. Create Input CSV
 
@@ -77,8 +88,10 @@ https://docs.google.com/document/d/FILE_ID_2/edit,API Reference,api,docs,referen
 **Link Discovery:**
 - The tool automatically crawls document contents
 - Follows links to other Google Docs/Drive files
+- **PDF support**: Converts PDFs to Google Docs format temporarily to extract links
 - Recursively discovers up to 5 levels deep (configurable with `-depth`)
 - Use `-depth 0` to disable recursive link discovery
+- Automatically cleans up temporary conversion files
 
 **Status meanings:**
 - `available` - File accessible and retrieved successfully
@@ -218,8 +231,16 @@ Your document content here...
 - Wait a few minutes between runs
 - Check Google Cloud Console quotas
 
+### "Failed to convert PDF" or permission errors
+- **Cause**: Insufficient write permissions for PDF conversion
+- **Service Account Fix**: Share folders with "Editor" permissions (IAM role doesn't matter)
+- **OAuth2 Fix**: Use `drive.file` scope and re-authenticate
+- **Alternative**: Tool will automatically fall back to basic text extraction (lower quality)
+
 ### "Unsupported file type"
-- Currently supports: Google Docs, PDFs
+- Currently supports:
+  - Google Docs (native markdown export)
+  - PDFs (converted via Google Docs for better quality, with text extraction fallback)
 - Other types will be skipped with a warning
 
 ## Next Steps
@@ -237,6 +258,7 @@ Your document content here...
 - **Enable verbose mode**: Use `-verbose` to see what's happening
 - **Dry run first**: Use `-dry-run` to preview output
 - **Adjust workers**: More workers = faster but more API calls
+- **PDF conversion**: PDFs are automatically converted using Google Docs for better quality (requires write access to Drive)
 
 ## Support
 

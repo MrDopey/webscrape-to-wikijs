@@ -312,33 +312,44 @@ func (d *Discoverer) executeFileWithRetry(fn func() (*drive.File, error)) (*driv
 // extractLinksFromDocument exports a document and extracts Google Drive/Docs URLs
 func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string {
 	var linkedURLs []string
+	var content []byte
+	var err error
 
-	// Only process Google Workspace documents (not PDFs or other files)
-	if !strings.HasPrefix(mimeType, "application/vnd.google-apps.") {
-		return linkedURLs
-	}
-
-	// Skip folders
-	if mimeType == "application/vnd.google-apps.folder" {
-		return linkedURLs
-	}
-
-	// Export document as plain text to search for links
-	resp, err := d.service.Files.Export(fileID, "text/markdown").Download()
-	if err != nil {
-		if d.verbose {
-			log.Printf("Warning: failed to export %s for link extraction: %v", fileID, err)
+	// Handle PDFs by converting to Google Docs format
+	if mimeType == "application/pdf" {
+		content, err = d.extractLinksFromPDF(fileID)
+		if err != nil {
+			if d.verbose {
+				log.Printf("Warning: failed to extract links from PDF %s: %v", fileID, err)
+			}
+			return linkedURLs
 		}
-		return linkedURLs
-	}
-	defer resp.Body.Close()
-
-	// Read content
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		if d.verbose {
-			log.Printf("Warning: failed to read content of %s: %v", fileID, err)
+	} else if strings.HasPrefix(mimeType, "application/vnd.google-apps.") {
+		// Skip folders
+		if mimeType == "application/vnd.google-apps.folder" {
+			return linkedURLs
 		}
+
+		// Export Google Workspace document as markdown to search for links
+		resp, err := d.service.Files.Export(fileID, "text/markdown").Download()
+		if err != nil {
+			if d.verbose {
+				log.Printf("Warning: failed to export %s for link extraction: %v", fileID, err)
+			}
+			return linkedURLs
+		}
+		defer resp.Body.Close()
+
+		// Read content
+		content, err = io.ReadAll(resp.Body)
+		if err != nil {
+			if d.verbose {
+				log.Printf("Warning: failed to read content of %s: %v", fileID, err)
+			}
+			return linkedURLs
+		}
+	} else {
+		// Unsupported file type for link extraction
 		return linkedURLs
 	}
 
@@ -370,6 +381,52 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 	}
 
 	return linkedURLs
+}
+
+// extractLinksFromPDF converts a PDF to Google Docs format and extracts its content for link discovery
+func (d *Discoverer) extractLinksFromPDF(fileID string) ([]byte, error) {
+	if d.verbose {
+		log.Printf("Converting PDF %s to Google Docs for link extraction...", fileID)
+	}
+
+	// Create a copy of the PDF as a Google Doc
+	// This mimics the "Open with Google Docs" behavior in the UI
+	copyFile := &drive.File{
+		Name:     "dev/temp/temp_link_extraction_" + fileID,
+		MimeType: "application/vnd.google-apps.document",
+	}
+
+	copiedFile, err := d.service.Files.Copy(fileID, copyFile).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert PDF to Google Docs: %w", err)
+	}
+
+	// Delete the temporary converted file when done
+	defer func() {
+		if err := d.service.Files.Delete(copiedFile.Id).Do(); err != nil {
+			if d.verbose {
+				log.Printf("Warning: Failed to delete temporary file %s: %v", copiedFile.Id, err)
+			}
+		}
+	}()
+
+	// Export the converted Google Doc as markdown
+	resp, err := d.service.Files.Export(copiedFile.Id, "text/markdown").Download()
+	if err != nil {
+		return nil, fmt.Errorf("failed to export converted document: %w", err)
+	}
+	defer resp.Body.Close()
+
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read converted content: %w", err)
+	}
+
+	if d.verbose {
+		log.Printf("Successfully extracted links from PDF %s using Google Docs conversion", fileID)
+	}
+
+	return content, nil
 }
 
 // extractFileID extracts the file/folder ID from a Google Drive URL
