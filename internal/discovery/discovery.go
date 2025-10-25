@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"regexp"
@@ -22,18 +23,22 @@ var (
 
 // Discoverer handles discovery of files in Google Drive
 type Discoverer struct {
-	service *drive.Service
-	verbose bool
-	mu      sync.Mutex
-	seen    map[string]bool // Track seen file IDs to avoid duplicates
+	service  *drive.Service
+	verbose  bool
+	maxDepth int
+	mu       sync.Mutex
+	seen     map[string]bool // Track seen file IDs to avoid duplicates
+	depth    map[string]int  // Track depth level for each file
 }
 
 // NewDiscoverer creates a new Discoverer
-func NewDiscoverer(service *drive.Service, verbose bool) *Discoverer {
+func NewDiscoverer(service *drive.Service, verbose bool, maxDepth int) *Discoverer {
 	return &Discoverer{
-		service: service,
-		verbose: verbose,
-		seen:    make(map[string]bool),
+		service:  service,
+		verbose:  verbose,
+		maxDepth: maxDepth,
+		seen:     make(map[string]bool),
+		depth:    make(map[string]int),
 	}
 }
 
@@ -58,47 +63,80 @@ func (d *Discoverer) DiscoverFromURLs(urls []string) ([]csv.DiscoveryRecord, err
 			continue
 		}
 
-		// Check if it's a folder or file
-		file, err := d.getFileMetadata(fileID)
+		// Discover from this file/folder at depth 0
+		fileRecords, err := d.discoverFromFileID(fileID, 0)
 		if err != nil {
-			// Determine error type
-			status := determineErrorStatus(err)
-			log.Printf("Warning: file %s status: %s (%v)", fileID, status, err)
-			record := csv.DiscoveryRecord{
-				Link:   buildFileLink(fileID),
-				Title:  fileID, // Use file ID as title since we can't get the name
-				Status: status,
-			}
-			mu.Lock()
-			records = append(records, record)
-			mu.Unlock()
+			log.Printf("Warning: failed to discover %s: %v", fileID, err)
 			continue
 		}
 
-		if d.verbose {
-			log.Printf("Processing: %s (%s)", file.Name, file.MimeType)
-		}
+		mu.Lock()
+		records = append(records, fileRecords...)
+		mu.Unlock()
+	}
 
-		if file.MimeType == "application/vnd.google-apps.folder" {
-			// Recursively discover folder contents
-			folderRecords, err := d.discoverFolder(fileID)
-			if err != nil {
-				log.Printf("Warning: failed to discover folder %s: %v", fileID, err)
-				continue
+	return records, nil
+}
+
+// discoverFromFileID discovers a file and recursively follows links within it
+func (d *Discoverer) discoverFromFileID(fileID string, currentDepth int) ([]csv.DiscoveryRecord, error) {
+	var records []csv.DiscoveryRecord
+
+	// Check if already seen
+	d.mu.Lock()
+	if d.seen[fileID] {
+		d.mu.Unlock()
+		return records, nil
+	}
+	d.seen[fileID] = true
+	d.depth[fileID] = currentDepth
+	d.mu.Unlock()
+
+	// Get file metadata
+	file, err := d.getFileMetadata(fileID)
+	if err != nil {
+		// Determine error type
+		status := determineErrorStatus(err)
+		log.Printf("Warning: file %s status: %s (%v)", fileID, status, err)
+		return []csv.DiscoveryRecord{{
+			Link:   buildFileLink(fileID),
+			Title:  fileID,
+			Status: status,
+		}}, nil
+	}
+
+	if d.verbose {
+		log.Printf("Processing: %s (%s) at depth %d", file.Name, file.MimeType, currentDepth)
+	}
+
+	if file.MimeType == "application/vnd.google-apps.folder" {
+		// Recursively discover folder contents
+		folderRecords, err := d.discoverFolder(fileID)
+		if err != nil {
+			log.Printf("Warning: failed to discover folder %s: %v", fileID, err)
+		}
+		records = append(records, folderRecords...)
+	} else {
+		// Add this file to records
+		records = append(records, csv.DiscoveryRecord{
+			Link:   buildFileLink(fileID),
+			Title:  file.Name,
+			Status: "available",
+		})
+
+		// If we haven't reached max depth, discover links within the document
+		if currentDepth < d.maxDepth {
+			linkedIDs := d.extractLinksFromDocument(fileID, file.MimeType)
+			for _, linkedID := range linkedIDs {
+				linkedRecords, err := d.discoverFromFileID(linkedID, currentDepth+1)
+				if err != nil {
+					log.Printf("Warning: failed to discover linked file %s: %v", linkedID, err)
+					continue
+				}
+				records = append(records, linkedRecords...)
 			}
-			mu.Lock()
-			records = append(records, folderRecords...)
-			mu.Unlock()
-		} else {
-			// Single file - mark as available
-			record := csv.DiscoveryRecord{
-				Link:   buildFileLink(fileID),
-				Title:  file.Name,
-				Status: "available",
-			}
-			mu.Lock()
-			records = append(records, record)
-			mu.Unlock()
+		} else if d.verbose && currentDepth >= d.maxDepth {
+			log.Printf("Max depth %d reached for %s, skipping link discovery", d.maxDepth, file.Name)
 		}
 	}
 
@@ -249,6 +287,66 @@ func (d *Discoverer) executeFileWithRetry(fn func() (*drive.File, error)) (*driv
 	}
 
 	return fn() // Final attempt
+}
+
+// extractLinksFromDocument exports a document and extracts Google Drive/Docs file IDs
+func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string {
+	var linkedIDs []string
+
+	// Only process Google Workspace documents (not PDFs or other files)
+	if !strings.HasPrefix(mimeType, "application/vnd.google-apps.") {
+		return linkedIDs
+	}
+
+	// Skip folders
+	if mimeType == "application/vnd.google-apps.folder" {
+		return linkedIDs
+	}
+
+	// Export document as plain text to search for links
+	resp, err := d.service.Files.Export(fileID, "text/plain").Download()
+	if err != nil {
+		if d.verbose {
+			log.Printf("Warning: failed to export %s for link extraction: %v", fileID, err)
+		}
+		return linkedIDs
+	}
+	defer resp.Body.Close()
+
+	// Read content
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		if d.verbose {
+			log.Printf("Warning: failed to read content of %s: %v", fileID, err)
+		}
+		return linkedIDs
+	}
+
+	// Find all Google Drive/Docs URLs in the content
+	// Pattern matches both drive.google.com and docs.google.com URLs
+	linkPattern := regexp.MustCompile(`https://(?:drive\.google\.com|docs\.google\.com)/[^\s\)]+`)
+	matches := linkPattern.FindAllString(string(content), -1)
+
+	// Extract file IDs from URLs
+	seenIDs := make(map[string]bool)
+	for _, urlStr := range matches {
+		id, err := extractFileID(urlStr)
+		if err != nil {
+			continue // Skip invalid URLs
+		}
+
+		// Avoid duplicates
+		if !seenIDs[id] && id != fileID { // Don't link to self
+			seenIDs[id] = true
+			linkedIDs = append(linkedIDs, id)
+		}
+	}
+
+	if d.verbose && len(linkedIDs) > 0 {
+		log.Printf("Found %d linked documents in %s", len(linkedIDs), fileID)
+	}
+
+	return linkedIDs
 }
 
 // extractFileID extracts the file/folder ID from a Google Drive URL

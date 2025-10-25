@@ -63,14 +63,22 @@ https://docs.google.com/document/d/FILE_ID_2/edit,API Reference,api,docs,referen
 
 ```bash
 # Discover all files in your Google Drive folders
+# Follows links within documents to discover referenced files (up to 5 levels deep)
 ./gdrive-crawler discover \
   -input examples/folders.csv \
   -output discovered-links.csv \
   -credentials credentials.json \
+  -depth 5 \
   -verbose
 ```
 
 **Output:** `discovered-links.csv` with columns: link, title, status
+
+**Link Discovery:**
+- The tool automatically crawls document contents
+- Follows links to other Google Docs/Drive files
+- Recursively discovers up to 5 levels deep (configurable with `-depth`)
+- Use `-depth 0` to disable recursive link discovery
 
 **Status meanings:**
 - `available` - File accessible and retrieved successfully

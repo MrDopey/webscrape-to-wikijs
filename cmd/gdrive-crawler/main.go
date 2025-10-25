@@ -30,6 +30,8 @@ Discover Flags:
         Output CSV file path (required)
   -credentials string
         Google API credentials JSON file (required)
+  -depth int
+        Maximum depth for recursive link discovery (default: 5)
   -verbose
         Enable verbose logging
 
@@ -83,6 +85,7 @@ func runDiscover() {
 	input := fs.String("input", "", "Input CSV file with Google Drive URLs (required)")
 	output := fs.String("output", "", "Output CSV file path (required)")
 	credentials := fs.String("credentials", "", "Google API credentials JSON file (required)")
+	depth := fs.Int("depth", 5, "Maximum depth for recursive link discovery (default: 5)")
 	verbose := fs.Bool("verbose", false, "Enable verbose logging")
 
 	fs.Parse(os.Args[2:])
@@ -126,7 +129,7 @@ func runDiscover() {
 	}
 
 	// Discover files
-	discoverer := discovery.NewDiscoverer(driveService.Service, *verbose)
+	discoverer := discovery.NewDiscoverer(driveService.Service, *verbose, *depth)
 	records, err := discoverer.DiscoverFromURLs(urls)
 	if err != nil {
 		log.Fatalf("Discovery failed: %v", err)

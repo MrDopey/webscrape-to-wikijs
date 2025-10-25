@@ -5,6 +5,7 @@ A comprehensive Go-based CLI tool for crawling Google Drive folders and converti
 ## Features
 
 - **Discovery Mode**: Recursively crawl Google Drive folders and extract all document links with titles
+- **Link Discovery**: Automatically follows links within documents to discover referenced files (configurable depth)
 - **Deleted File Tracking**: Automatically indexes deleted/inaccessible files with "deleted" status for documentation tracking
 - **Conversion Mode**: Convert Google Drive documents to markdown with intelligent link rewriting and frontmatter
 - **Multiple File Types**: Supports Google Docs (native markdown export) and PDFs (text extraction)
@@ -73,15 +74,25 @@ go build -o gdrive-crawler ./cmd/gdrive-crawler
 
 ### Mode 1: Discovery
 
-Discover all files in Google Drive folders and output a CSV with links and titles.
+Discover all files in Google Drive folders and output a CSV with links and titles. The tool automatically follows links within documents to discover referenced files.
 
 ```bash
 ./gdrive-crawler discover \
   -input folders.csv \
   -output links.csv \
   -credentials credentials.json \
+  -depth 5 \
   -verbose
 ```
+
+**Recursive Link Discovery:**
+The discovery mode now crawls document contents to find and follow links to other Google Docs/Drive files:
+- Exports each document as plain text
+- Searches for Google Drive/Docs URLs in the content
+- Recursively discovers linked documents up to the specified depth
+- Stops at configurable depth (default: 5 levels)
+- Stops when encountering non-Google Drive files
+- Prevents infinite loops with duplicate detection
 
 **Input CSV Format** (`folders.csv`):
 ```csv
@@ -164,6 +175,7 @@ title: Getting Started
 #### Discovery Mode Flags
 - `-input string`: Input CSV file with Google Drive URLs (required)
 - `-output string`: Output CSV file path (required)
+- `-depth int`: Maximum depth for recursive link discovery (default: 5)
 
 #### Conversion Mode Flags
 - `-input string`: Input CSV with link, title, tags, frag1-5 columns (required)
@@ -207,9 +219,15 @@ webscrape-to-wikijs/
 
 #### Discovery (`internal/discovery`)
 - Recursive folder traversal using Google Drive API
+- **Recursive link discovery**: Crawls document contents to find and follow links to other Google Drive files
+  - Exports documents as plain text to extract URLs
+  - Searches for Google Drive/Docs links within content
+  - Recursively discovers linked documents up to configurable depth (default: 5)
+  - Depth tracking prevents infinite recursion
+  - Automatically stops when encountering non-Google Drive files
 - Duplicate detection to avoid processing same files multiple times
 - Exponential backoff for rate limit handling
-- Progress logging for long-running operations
+- Progress logging for long-running operations with depth information
 - **Deleted file tracking**: Files that are deleted or inaccessible are still indexed with status="deleted" for documentation tracking
 
 #### File Status Tracking
