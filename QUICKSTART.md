@@ -49,7 +49,8 @@ sudo mv gdrive-crawler /usr/local/bin/
 
 **Note**:
 - The tool uses full Drive scope by default (`https://www.googleapis.com/auth/drive`)
-- If you previously authenticated with different permissions, delete your stored token and re-authenticate
+- OAuth tokens are saved to `~/.credentials/gdrive-crawler-token.json` - you only authenticate once
+- To reset: `rm ~/.credentials/gdrive-crawler-token.json` and run the tool again
 - Temporary files are created in your Drive root and automatically deleted after processing
 - See [PDF Processing Requirements](README.md#pdf-processing-requirements) for details
 
@@ -234,7 +235,7 @@ Your document content here...
 ### "Failed to convert PDF" or permission errors
 - **Cause**: Insufficient permissions for PDF conversion
 - **Service Account Fix**: Share folders with "Editor" permissions (IAM role doesn't matter)
-- **OAuth2 Fix**: Delete stored token and re-authenticate (tool uses full Drive scope by default)
+- **OAuth2 Fix**: `rm ~/.credentials/gdrive-crawler-token.json` and re-authenticate
 - **Alternative**: Tool will automatically fall back to basic text extraction (lower quality)
 
 ### "Unsupported file type"

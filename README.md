@@ -77,9 +77,11 @@ go build -o gdrive-crawler ./cmd/gdrive-crawler
 6. Download the credentials JSON file
 7. Save it as `credentials.json`
 
-**Important**: The tool uses full Drive scope (`drive`) by default. If you previously authenticated with different permissions, you need to re-authenticate:
-1. Delete your stored OAuth token (usually in `~/.credentials/` or similar)
-2. Run the tool again - it will prompt you to authorize with the new scope
+**Token Storage**: OAuth tokens are automatically saved to `~/.credentials/gdrive-crawler-token.json` after first authentication. You won't need to re-authenticate on subsequent runs.
+
+**To Reset Credentials** (if you need to change accounts or update permissions):
+1. Delete the stored token: `rm ~/.credentials/gdrive-crawler-token.json`
+2. Run the tool again - it will prompt you to authorize with a fresh login
 
 ## PDF Processing Requirements
 
@@ -479,7 +481,7 @@ The tool handles various error scenarios gracefully:
 - **OAuth2 Solution** (if you previously used an older version with different scope):
   - The tool now uses full Drive scope (`drive`) by default (no code changes needed)
   - Delete stored OAuth token and re-authenticate:
-    - Look for token in `~/.credentials/`, `token.json`, or similar files
+    - Run: `rm ~/.credentials/gdrive-crawler-token.json`
     - Run the tool again - it will prompt for authorization with the new scope
 - **Workaround**: The tool will automatically fall back to basic text extraction (lower quality) if conversion fails
 
