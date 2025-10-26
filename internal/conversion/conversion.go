@@ -340,22 +340,15 @@ func convertPDFToMarkdown(pdfPath string) ([]byte, error) {
 // Example: "*https://docs.google.com/document/d/abc*\n*defg/edit*" -> "https://docs.google.com/document/d/abcdefg/edit"
 // Example: "https://docs.google.com/document/d/abc\_def/edit" -> "https://docs.google.com/document/d/abc_def/edit"
 func normalizeMultilineURLs(content string) string {
-	// Step 1: Fix URLs broken across multiple lines FIRST (before unescaping)
+	// Step 1: Fix URLs broken across adjacent lines FIRST (before unescaping)
 	// Pattern to match Google Drive URL that might continue on next line
-	// Uses [^\s\n]+? (non-greedy) to allow underscores, backslashes, etc in URLs
+	// Excludes * and _ from URL parts so they're only matched as markdown delimiters
 	// Explicitly matches and strips markdown markers (*/_) around the line break
+	// Only joins adjacent pairs - does not handle URLs broken across 3+ lines
 	urlContinuationPattern := regexp.MustCompile(
-		`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\n]+?)[\*_]*\s*\n\s*[\*_]*([^\s\n]+?)[\*_]*`,
+		`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\n*_]+)[\*_]*\s*\n\s*[\*_]*([^\s\n*_]+)[\*_]*`,
 	)
-
-	// Keep replacing until no more matches (handles multi-line breaks)
-	for {
-		normalized := urlContinuationPattern.ReplaceAllString(content, "$1$2")
-		if normalized == content {
-			break
-		}
-		content = normalized
-	}
+	content = urlContinuationPattern.ReplaceAllString(content, "$1$2")
 
 	// Step 2: Unescape markdown characters within Google Drive URLs
 	// This handles cases like \_  \*  etc. that are escaped in markdown
