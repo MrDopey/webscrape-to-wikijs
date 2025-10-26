@@ -605,6 +605,16 @@ func extractFileID(urlStr string) (string, error) {
 	var driveIDPattern = regexp.MustCompile(`[-\w]{25,}`)
 
 	// Try to extract ID from various URL formats
+	// Handle Google Forms pattern: /forms/d/e/{id}/viewform
+	if strings.Contains(urlStr, "/d/e/") {
+		parts := strings.Split(urlStr, "/d/e/")
+		if len(parts) > 1 {
+			id := strings.Split(parts[1], "/")[0]
+			return id, nil
+		}
+	}
+
+	// Handle standard pattern: /d/{id}
 	if strings.Contains(urlStr, "/d/") {
 		parts := strings.Split(urlStr, "/d/")
 		if len(parts) > 1 {

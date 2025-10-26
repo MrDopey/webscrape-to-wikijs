@@ -485,8 +485,14 @@ func extractFileID(urlStr string) (string, error) {
 	// Format: /file/d/{id}/...
 	// Format: /folders/{id}
 	// Format: /document/d/{id}/...
+	// Format: /forms/d/e/{id}/... (Google Forms)
 	parts := strings.Split(u.Path, "/")
 	for i, part := range parts {
+		// Check for Google Forms pattern: /forms/d/e/{id}
+		if part == "d" && i+1 < len(parts) && parts[i+1] == "e" && i+2 < len(parts) {
+			return parts[i+2], nil
+		}
+		// Standard patterns
 		if (part == "d" || part == "folders") && i+1 < len(parts) {
 			return parts[i+1], nil
 		}
@@ -516,7 +522,7 @@ func buildFileLink(fileID string, mimeType string) string {
 	case "application/vnd.google-apps.presentation":
 		return fmt.Sprintf("https://docs.google.com/presentation/d/%s/edit", fileID)
 	case "application/vnd.google-apps.form":
-		return fmt.Sprintf("https://docs.google.com/forms/d/%s/edit", fileID)
+		return fmt.Sprintf("https://docs.google.com/forms/d/e/%s/viewform", fileID)
 	case "application/vnd.google-apps.drawing":
 		return fmt.Sprintf("https://docs.google.com/drawings/d/%s/edit", fileID)
 	case "application/vnd.google-apps.folder":
