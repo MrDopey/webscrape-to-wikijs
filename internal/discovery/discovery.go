@@ -351,7 +351,7 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 	var err error
 
 	// Handle PDFs by converting to Google Docs format
-	if mimeType == "application/pdf" {
+	if mimeType == "application/pdf" || mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" {
 		content, err = d.extractLinksFromPDF(fileID)
 		if err != nil {
 			if d.verbose {

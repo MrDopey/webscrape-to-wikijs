@@ -129,7 +129,7 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 		if err != nil {
 			return fmt.Errorf("failed to export %s as markdown: %w", record.Title, err)
 		}
-	} else if file.MimeType == "application/pdf" {
+	} else if file.MimeType == "application/pdf" || file.MimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" {
 		// PDF - convert to Google Docs format (like "Open with Google Docs" in UI)
 		content, revisionHash, err = c.convertPDFViaGoogleDocs(fileID, file.ModifiedTime)
 		if err != nil {
