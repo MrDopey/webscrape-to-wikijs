@@ -50,7 +50,7 @@ func (c *Converter) Convert(records []csv.ConversionRecord, workers int) error {
 		c.linkMap[records[i].Link] = &records[i]
 
 		// Also index by file ID for cross-format matching
-		fileID, err := extractFileID(records[i].Link)
+		fileID, err := utils.ExtractFileID(records[i].Link)
 		if err != nil {
 			log.Printf("Warning: failed to extract file ID from %s: %v", records[i].Link, err)
 			continue
@@ -111,7 +111,7 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 	}
 
 	// Extract file ID
-	fileID, err := extractFileID(record.Link)
+	fileID, err := utils.ExtractFileID(record.Link)
 	if err != nil {
 		return fmt.Errorf("failed to extract file ID from %s: %w", record.Link, err)
 	}
@@ -477,38 +477,6 @@ func convertPDFToMarkdown(pdfPath string) ([]byte, error) {
 	return []byte(sb.String()), nil
 }
 
-// normalizeMultilineURLs fixes Google Drive/Docs URLs that are broken across multiple lines
-// and unescapes markdown characters within URLs
-// Example: "*https://docs.google.com/document/d/abc*\n*defg/edit*" -> "https://docs.google.com/document/d/abcdefg/edit"
-// Example: "https://docs.google.com/document/d/abc\_def/edit" -> "https://docs.google.com/document/d/abc_def/edit"
-func normalizeMultilineURLs(content string) string {
-	// Step 1: Fix URLs broken across adjacent lines FIRST (before unescaping)
-	// Pattern to match Google Drive URL that might continue on next line
-	// Excludes * and _ from URL parts so they're only matched as markdown delimiters
-	// Explicitly matches and strips markdown markers (*/_) around the line break
-	// Only joins adjacent pairs - does not handle URLs broken across 3+ lines
-	urlContinuationPattern := regexp.MustCompile(
-		`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\n*_]+)[\*_]*\s*\n\s*[\*_]*([^\s\n*_]+)[\*_]*`,
-	)
-	content = urlContinuationPattern.ReplaceAllString(content, "$1$2")
-
-	// Step 2: Unescape markdown characters within Google Drive URLs
-	// This handles cases like \_  \*  etc. that are escaped in markdown
-	// Do this AFTER joining lines so we unescape the complete URL
-	escapedCharsPattern := regexp.MustCompile(`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\n]*)`)
-	content = escapedCharsPattern.ReplaceAllStringFunc(content, func(url string) string {
-		// Remove backslash escapes from common markdown characters
-		url = strings.ReplaceAll(url, `\_`, `_`)
-		url = strings.ReplaceAll(url, `\*`, `*`)
-		url = strings.ReplaceAll(url, `\-`, `-`)
-		url = strings.ReplaceAll(url, `\[`, `[`)
-		url = strings.ReplaceAll(url, `\]`, `]`)
-		return url
-	})
-
-	return content
-}
-
 func (c *Converter) preamble(sourceRecord *csv.ConversionRecord) string {
 	return fmt.Sprintf("> Link: %s", sourceRecord.Link)
 }
@@ -516,7 +484,7 @@ func (c *Converter) preamble(sourceRecord *csv.ConversionRecord) string {
 // rewriteLinks rewrites Google Drive/Docs links to relative paths
 func (c *Converter) rewriteLinks(content string, sourceRecord *csv.ConversionRecord) string {
 	// Normalize content to fix URLs broken across multiple lines
-	content = normalizeMultilineURLs(content)
+	content = utils.NormalizeMultilineURLs(content)
 
 	// Pattern to match Google Drive and Google Docs links
 	// Using non-capturing group (?:...) for domain alternation
@@ -536,7 +504,7 @@ func (c *Converter) rewriteLinks(content string, sourceRecord *csv.ConversionRec
 
 		// If not found by URL, try by file ID (for cross-format matching)
 		if !exists {
-			targetID, err := extractFileID(linkURL)
+			targetID, err := utils.ExtractFileID(linkURL)
 			if err != nil {
 				return match // Keep original if we can't extract ID
 			}
@@ -759,36 +727,3 @@ func normalizeFilename(filename string) string {
 	return filename
 }
 
-// extractFileID extracts the file ID from a Google Drive URL
-func extractFileID(urlStr string) (string, error) {
-	// This is duplicated from discovery package for now
-	// Could be moved to utils if needed
-	var driveIDPattern = regexp.MustCompile(`[-\w]{25,}`)
-
-	// Try to extract ID from various URL formats
-	// Handle Google Forms pattern: /forms/d/e/{id}/viewform
-	if strings.Contains(urlStr, "/d/e/") {
-		parts := strings.Split(urlStr, "/d/e/")
-		if len(parts) > 1 {
-			id := strings.Split(parts[1], "/")[0]
-			return id, nil
-		}
-	}
-
-	// Handle standard pattern: /d/{id}
-	if strings.Contains(urlStr, "/d/") {
-		parts := strings.Split(urlStr, "/d/")
-		if len(parts) > 1 {
-			id := strings.Split(parts[1], "/")[0]
-			return id, nil
-		}
-	}
-
-	// Try pattern matching
-	matches := driveIDPattern.FindStringSubmatch(urlStr)
-	if len(matches) > 0 {
-		return matches[0], nil
-	}
-
-	return "", fmt.Errorf("could not extract file ID from URL: %s", urlStr)
-}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -14,11 +13,7 @@ import (
 	"google.golang.org/api/googleapi"
 
 	"github.com/yourusername/webscrape-to-wikijs/internal/csv"
-)
-
-var (
-	// Regex patterns for extracting file/folder IDs from URLs
-	driveIDPattern = regexp.MustCompile(`[-\w]{25,}`)
+	"github.com/yourusername/webscrape-to-wikijs/internal/utils"
 )
 
 // Discoverer handles discovery of files in Google Drive
@@ -48,7 +43,7 @@ func (d *Discoverer) DiscoverFromURLs(urls []string) ([]csv.DiscoveryRecord, err
 	var mu sync.Mutex
 
 	for _, urlStr := range urls {
-		fileID, err := extractFileID(urlStr)
+		fileID, err := utils.ExtractFileID(urlStr)
 		if err != nil {
 			// Invalid URL or malformed file ID - mark as invalid
 			log.Printf("Warning: invalid URL or file ID in %s: %v", urlStr, err)
@@ -106,7 +101,7 @@ func (d *Discoverer) discoverFromFileIDWithURL(fileID string, originalURL string
 		// Use original URL if available, otherwise construct one
 		link := originalURL
 		if link == "" {
-			link = buildFileLink(fileID, "")
+			link = utils.BuildFileLink(fileID, "")
 		}
 		return []csv.DiscoveryRecord{{
 			Link:   link,
@@ -131,7 +126,7 @@ func (d *Discoverer) discoverFromFileIDWithURL(fileID string, originalURL string
 		// Use original URL if available, otherwise construct one based on MIME type
 		link := originalURL
 		if link == "" {
-			link = buildFileLink(fileID, file.MimeType)
+			link = utils.BuildFileLink(fileID, file.MimeType)
 		}
 		records = append(records, csv.DiscoveryRecord{
 			Link:   link,
@@ -143,7 +138,7 @@ func (d *Discoverer) discoverFromFileIDWithURL(fileID string, originalURL string
 		if currentDepth < d.maxDepth {
 			linkedURLs := d.extractLinksFromDocument(fileID, file.MimeType)
 			for _, linkedURL := range linkedURLs {
-				linkedID, err := extractFileID(linkedURL)
+				linkedID, err := utils.ExtractFileID(linkedURL)
 				if err != nil {
 					log.Printf("Warning: failed to extract file ID from %s: %v", linkedURL, err)
 					continue
@@ -222,7 +217,7 @@ func (d *Discoverer) discoverFolder(folderID string) ([]csv.DiscoveryRecord, err
 			} else {
 				// Add file record - mark as available since we successfully retrieved it
 				records = append(records, csv.DiscoveryRecord{
-					Link:   buildFileLink(file.Id, file.MimeType),
+					Link:   utils.BuildFileLink(file.Id, file.MimeType),
 					Title:  file.Name,
 					Status: "available",
 				})
@@ -312,38 +307,6 @@ func (d *Discoverer) executeFileWithRetry(fn func() (*drive.File, error)) (*driv
 	return fn() // Final attempt
 }
 
-// normalizeMultilineURLs fixes Google Drive/Docs URLs that are broken across multiple lines
-// and unescapes markdown characters within URLs
-// Example: "*https://docs.google.com/document/d/abc*\n*defg/edit*" -> "https://docs.google.com/document/d/abcdefg/edit"
-// Example: "https://docs.google.com/document/d/abc\_def/edit" -> "https://docs.google.com/document/d/abc_def/edit"
-func normalizeMultilineURLs(content string) string {
-	// Step 1: Fix URLs broken across adjacent lines FIRST (before unescaping)
-	// Pattern to match Google Drive URL that might continue on next line
-	// Excludes * and _ from URL parts so they're only matched as markdown delimiters
-	// Explicitly matches and strips markdown markers (*/_) around the line break
-	// Only joins adjacent pairs - does not handle URLs broken across 3+ lines
-	urlContinuationPattern := regexp.MustCompile(
-		`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\n*_]+)[\*_]*\s*\n\s*[\*_]*([^\s\n*_]+)[\*_]*`,
-	)
-	content = urlContinuationPattern.ReplaceAllString(content, "$1$2")
-
-	// Step 2: Unescape markdown characters within Google Drive URLs
-	// This handles cases like \_  \*  etc. that are escaped in markdown
-	// Do this AFTER joining lines so we unescape the complete URL
-	escapedCharsPattern := regexp.MustCompile(`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\n]*)`)
-	content = escapedCharsPattern.ReplaceAllStringFunc(content, func(url string) string {
-		// Remove backslash escapes from common markdown characters
-		url = strings.ReplaceAll(url, `\_`, `_`)
-		url = strings.ReplaceAll(url, `\*`, `*`)
-		url = strings.ReplaceAll(url, `\-`, `-`)
-		url = strings.ReplaceAll(url, `\[`, `[`)
-		url = strings.ReplaceAll(url, `\]`, `]`)
-		return url
-	})
-
-	return content
-}
-
 // extractLinksFromDocument exports a document and extracts Google Drive/Docs URLs
 func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string {
 	var linkedURLs []string
@@ -389,7 +352,7 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 	}
 
 	// Normalize content to fix URLs broken across multiple lines
-	normalizedContent := normalizeMultilineURLs(string(content))
+	normalizedContent := utils.NormalizeMultilineURLs(string(content))
 
 	// Find all Google Drive/Docs URLs in the content
 	// Pattern matches both drive.google.com and docs.google.com URLs
@@ -398,7 +361,7 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 
 	// Process URLs and preserve them
 	for _, urlStr := range matches {
-		id, err := extractFileID(urlStr)
+		id, err := utils.ExtractFileID(urlStr)
 		if err != nil {
 			continue // Skip invalid URLs
 		}
@@ -465,72 +428,6 @@ func (d *Discoverer) extractLinksFromPDF(fileID string) ([]byte, error) {
 	}
 
 	return content, nil
-}
-
-// extractFileID extracts the file/folder ID from a Google Drive URL
-func extractFileID(urlStr string) (string, error) {
-	log.Printf("Extracting file id from: %s", urlStr)
-	// Parse URL
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return "", fmt.Errorf("invalid URL: %w", err)
-	}
-
-	// Check if it's a Google Drive URL
-	if !strings.Contains(u.Host, "drive.google.com") && !strings.Contains(u.Host, "docs.google.com") {
-		return "", fmt.Errorf("not a Google Drive URL")
-	}
-
-	// Try to extract ID from path
-	// Format: /file/d/{id}/...
-	// Format: /folders/{id}
-	// Format: /document/d/{id}/...
-	// Format: /forms/d/e/{id}/... (Google Forms)
-	parts := strings.Split(u.Path, "/")
-	for i, part := range parts {
-		// Check for Google Forms pattern: /forms/d/e/{id}
-		if part == "d" && i+1 < len(parts) && parts[i+1] == "e" && i+2 < len(parts) {
-			return parts[i+2], nil
-		}
-		// Standard patterns
-		if (part == "d" || part == "folders") && i+1 < len(parts) {
-			return parts[i+1], nil
-		}
-	}
-
-	// Try to extract from query parameter
-	if id := u.Query().Get("id"); id != "" {
-		return id, nil
-	}
-
-	// Try to match ID pattern in the entire URL
-	matches := driveIDPattern.FindStringSubmatch(urlStr)
-	if len(matches) > 0 {
-		return matches[0], nil
-	}
-
-	return "", fmt.Errorf("could not extract file ID from URL")
-}
-
-// buildFileLink constructs an appropriate Google link from an ID and MIME type
-func buildFileLink(fileID string, mimeType string) string {
-	switch mimeType {
-	case "application/vnd.google-apps.document":
-		return fmt.Sprintf("https://docs.google.com/document/d/%s/edit", fileID)
-	case "application/vnd.google-apps.spreadsheet":
-		return fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit", fileID)
-	case "application/vnd.google-apps.presentation":
-		return fmt.Sprintf("https://docs.google.com/presentation/d/%s/edit", fileID)
-	case "application/vnd.google-apps.form":
-		return fmt.Sprintf("https://docs.google.com/forms/d/e/%s/viewform", fileID)
-	case "application/vnd.google-apps.drawing":
-		return fmt.Sprintf("https://docs.google.com/drawings/d/%s/edit", fileID)
-	case "application/vnd.google-apps.folder":
-		return fmt.Sprintf("https://drive.google.com/drive/folders/%s", fileID)
-	default:
-		// For non-Google Workspace files (PDFs, images, etc.)
-		return fmt.Sprintf("https://drive.google.com/file/d/%s/view", fileID)
-	}
 }
 
 // determineErrorStatus determines the status based on the API error

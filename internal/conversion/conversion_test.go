@@ -2,6 +2,8 @@ package conversion
 
 import (
 	"testing"
+
+	"github.com/yourusername/webscrape-to-wikijs/internal/utils"
 )
 
 func TestExtractFileID(t *testing.T) {
@@ -37,9 +39,9 @@ func TestExtractFileID(t *testing.T) {
 			want: "file123456",
 		},
 		{
-			name:    "Google Drive folder URL - not supported in conversion",
-			url:     "https://drive.google.com/drive/folders/folder789012",
-			wantErr: true, // Folders are not converted, only discovered
+			name: "Google Drive folder URL - can extract ID",
+			url:  "https://drive.google.com/drive/folders/folder789012",
+			want: "folder789012", // ID can be extracted even though folders aren't converted
 		},
 		{
 			name:    "Invalid URL - not Google Drive",
@@ -55,13 +57,13 @@ func TestExtractFileID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := extractFileID(tt.url)
+			got, err := utils.ExtractFileID(tt.url)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("extractFileID() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ExtractFileID() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && got != tt.want {
-				t.Errorf("extractFileID() = %v, want %v", got, tt.want)
+				t.Errorf("ExtractFileID() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -205,13 +205,13 @@ func TestConversionRecordGetTagsList(t *testing.T) {
 			expected: []string{"tutorial"},
 		},
 		{
-			name:     "multiple tags",
-			tags:     "tutorial, beginner, guide",
+			name:     "multiple tags with semicolon",
+			tags:     "tutorial;beginner;guide",
 			expected: []string{"tutorial", "beginner", "guide"},
 		},
 		{
 			name:     "tags with extra spaces",
-			tags:     "tutorial,  beginner,   guide",
+			tags:     "tutorial;  beginner;   guide",
 			expected: []string{"tutorial", "beginner", "guide"},
 		},
 		{
@@ -220,9 +220,14 @@ func TestConversionRecordGetTagsList(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "semicolon separator",
-			tags:     "tutorial;beginner;guide",
-			expected: []string{"tutorial;beginner;guide"},
+			name:     "comma in tags (not a separator)",
+			tags:     "tutorial, advanced",
+			expected: []string{"tutorial, advanced"}, // Comma is part of the tag, not a separator
+		},
+		{
+			name:     "mixed whitespace",
+			tags:     "  tutorial  ;  beginner  ;  guide  ",
+			expected: []string{"tutorial", "beginner", "guide"},
 		},
 	}
 

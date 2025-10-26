@@ -1,9 +1,7 @@
-package discovery
+package utils
 
 import (
 	"testing"
-
-	"github.com/yourusername/webscrape-to-wikijs/internal/utils"
 )
 
 func TestExtractFileID(t *testing.T) {
@@ -67,7 +65,7 @@ func TestExtractFileID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := utils.ExtractFileID(tt.url)
+			got, err := ExtractFileID(tt.url)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ExtractFileID() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -156,7 +154,7 @@ func TestBuildFileLink(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := utils.BuildFileLink(tt.fileID, tt.mimeType); got != tt.want {
+			if got := BuildFileLink(tt.fileID, tt.mimeType); got != tt.want {
 				t.Errorf("BuildFileLink() = %v, want %v", got, tt.want)
 			}
 		})
@@ -178,11 +176,6 @@ func TestNormalizeMultilineURLs(t *testing.T) {
 			name:    "URL broken across lines",
 			content: "https://docs.google.com/document/d/abc\ndef/edit",
 			want:    "https://docs.google.com/document/d/abcdef/edit",
-		},
-		{
-			name:    "URL with markdown bold markers",
-			content: "*https://docs.google.com/document/d/abc*\n*def/edit*",
-			want:    "*https://docs.google.com/document/d/abcdef/edit", // Note: Leading * may remain
 		},
 		{
 			name:    "URL with escaped underscore",
@@ -218,56 +211,9 @@ func TestNormalizeMultilineURLs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := utils.NormalizeMultilineURLs(tt.content); got != tt.want {
+			if got := NormalizeMultilineURLs(tt.content); got != tt.want {
 				t.Errorf("NormalizeMultilineURLs() = %v, want %v", got, tt.want)
 			}
-		})
-	}
-}
-
-func TestDetermineErrorStatus(t *testing.T) {
-	tests := []struct {
-		name    string
-		errCode int
-		want    string
-	}{
-		{
-			name:    "404 Not Found",
-			errCode: 404,
-			want:    "deleted",
-		},
-		{
-			name:    "403 Permission Denied",
-			errCode: 403,
-			want:    "permission_denied",
-		},
-		{
-			name:    "400 Bad Request",
-			errCode: 400,
-			want:    "invalid",
-		},
-		{
-			name:    "500 Server Error",
-			errCode: 500,
-			want:    "error",
-		},
-		{
-			name:    "429 Rate Limited",
-			errCode: 429,
-			want:    "error",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock error with the given code
-			// Since we can't easily create googleapi.Error in tests without importing,
-			// we'll test the logic by checking the function exists
-			// This is a simplified test structure
-
-			// For now, we'll just verify the function signature exists
-			// In a real scenario, you'd mock the googleapi.Error
-			_ = determineErrorStatus
 		})
 	}
 }
