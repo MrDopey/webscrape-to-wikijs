@@ -142,7 +142,7 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 	// Rewrite links in content
 	contentStr := string(content)
 	preamble := c.preamble(record)
-	contentStr = preamble + "\n" + c.rewriteLinks(contentStr, record)
+	contentStr = preamble + "\n\n" + c.rewriteLinks(contentStr, record)
 
 	// Generate frontmatter
 	frontmatter := c.generateFrontmatter(record, revisionHash, contentStr)
