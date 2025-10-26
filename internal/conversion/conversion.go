@@ -116,6 +116,11 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 		return fmt.Errorf("failed to extract file ID from %s: %w", record.Link, err)
 	}
 
+	// Check if this is a Google Form - handle as special case
+	if c.isGoogleForm(record.Link) {
+		return c.convertGoogleForm(record)
+	}
+
 	// Get file metadata
 	file, err := c.getFileMetadata(fileID)
 	if err != nil {
@@ -149,6 +154,60 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 
 	// Generate frontmatter
 	frontmatter := c.generateFrontmatter(record, revisionHash, contentStr)
+
+	// Combine frontmatter and content
+	finalContent := frontmatter + "\n" + contentStr
+
+	// Build output path with normalized filename
+	normalizedTitle := normalizeFilename(record.Title)
+	outputPath := utils.BuildOutputPath(c.outputDir, normalizedTitle, record.GetFragments())
+
+	// Ensure unique path
+	c.mu.Lock()
+	outputPath = utils.EnsureUniquePath(outputPath, c.existingPaths)
+	c.existingPaths[outputPath] = true
+	c.mu.Unlock()
+
+	if c.dryRun {
+		log.Printf("Would write: %s", outputPath)
+		return nil
+	}
+
+	// Create directory structure
+	dir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// Write file
+	if err := os.WriteFile(outputPath, []byte(finalContent), 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", outputPath, err)
+	}
+
+	if c.verbose {
+		log.Printf("Wrote: %s", outputPath)
+	}
+
+	return nil
+}
+
+// isGoogleForm checks if a URL is a Google Form
+func (c *Converter) isGoogleForm(urlStr string) bool {
+	return strings.Contains(urlStr, "docs.google.com/forms")
+}
+
+// convertGoogleForm creates a stub document for a Google Form
+func (c *Converter) convertGoogleForm(record *csv.ConversionRecord) error {
+	if c.verbose {
+		log.Printf("Creating stub for Google Form: %s", record.Title)
+	}
+
+	// Create stub content with just the preamble
+	preamble := c.preamble(record)
+	contentStr := preamble + "\n\n*This is a Google Form. Forms cannot be exported to markdown format.*"
+
+	// Generate frontmatter with stub hash
+	frontmatter := c.generateFrontmatterStub(record, contentStr)
 
 	// Combine frontmatter and content
 	finalContent := frontmatter + "\n" + contentStr
@@ -428,6 +487,28 @@ func (c *Converter) generateFrontmatter(record *csv.ConversionRecord, revisionHa
 	sb.WriteString("editor: markdown\n")
 	sb.WriteString(fmt.Sprintf("gdrive-link: %s\n", escapeYAML(record.Link)))
 	sb.WriteString(fmt.Sprintf("hash-gdrive: %s\n", escapeYAML(revisionHash)))
+	sb.WriteString(fmt.Sprintf("hash-content: %s\n", utils.CalculateStringHash(content)))
+	sb.WriteString("published: true\n")
+
+	tags := record.GetTagsList()
+	if len(tags) > 0 {
+		sb.WriteString(fmt.Sprintf("tags: %s\n", strings.Join(tags, ", ")))
+	}
+
+	sb.WriteString(fmt.Sprintf("title: %s\n", escapeYAML(record.Title)))
+	sb.WriteString("---\n")
+
+	return sb.String()
+}
+
+// generateFrontmatterStub generates YAML frontmatter for stub documents (like Google Forms)
+func (c *Converter) generateFrontmatterStub(record *csv.ConversionRecord, content string) string {
+	var sb strings.Builder
+	sb.WriteString("---\n")
+	sb.WriteString(fmt.Sprintf("description: %s\n", escapeYAML(record.Title)))
+	sb.WriteString("editor: markdown\n")
+	sb.WriteString(fmt.Sprintf("gdrive-link: %s\n", escapeYAML(record.Link)))
+	sb.WriteString("hash-gdrive: stub\n")
 	sb.WriteString(fmt.Sprintf("hash-content: %s\n", utils.CalculateStringHash(content)))
 	sb.WriteString("published: true\n")
 
