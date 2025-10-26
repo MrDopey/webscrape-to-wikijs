@@ -555,6 +555,11 @@ func (c *Converter) executeDownloadWithRetry(fileID string) (io.ReadCloser, erro
 
 // normalizeFilename normalizes a filename to be lowercase, hyphenated, and without special characters
 func normalizeFilename(filename string) string {
+	// Strip file extension if present
+	if idx := strings.LastIndex(filename, "."); idx != -1 {
+		filename = filename[:idx]
+	}
+
 	// Convert to lowercase
 	filename = strings.ToLower(filename)
 
