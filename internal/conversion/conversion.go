@@ -199,14 +199,19 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 // requiresStubConversion checks if a URL is for a document type that cannot be converted to markdown
 func (c *Converter) requiresStubConversion(urlStr string) bool {
 	return strings.Contains(urlStr, "docs.google.com/forms") ||
-		strings.Contains(urlStr, "docs.google.com/spreadsheets")
+		strings.Contains(urlStr, "docs.google.com/spreadsheets") ||
+		strings.Contains(urlStr, "docs.google.com/presentation")
 }
 
 // isUnsupportedMediaType checks if a MIME type cannot be converted to markdown
 func (c *Converter) isUnsupportedMediaType(mimeType string) bool {
 	return strings.HasPrefix(mimeType, "video/") ||
 		strings.HasPrefix(mimeType, "audio/") ||
-		strings.HasPrefix(mimeType, "image/")
+		strings.HasPrefix(mimeType, "image/") ||
+		mimeType == "application/vnd.google-apps.presentation" ||
+		mimeType == "application/vnd.google-apps.spreadsheet" ||
+		mimeType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+		mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 }
 
 // getDocumentType returns a human-readable type for stub documents
@@ -216,6 +221,9 @@ func (c *Converter) getDocumentType(urlStr string) string {
 	}
 	if strings.Contains(urlStr, "docs.google.com/spreadsheets") {
 		return "Google Sheet"
+	}
+	if strings.Contains(urlStr, "docs.google.com/presentation") {
+		return "Google Presentation"
 	}
 	return "Google Document"
 }
@@ -230,6 +238,18 @@ func (c *Converter) getDocumentTypeFromMimeType(mimeType string) string {
 	}
 	if strings.HasPrefix(mimeType, "image/") {
 		return "image file"
+	}
+	if mimeType == "application/vnd.google-apps.presentation" {
+		return "Google Presentation"
+	}
+	if mimeType == "application/vnd.google-apps.spreadsheet" {
+		return "Google Sheet"
+	}
+	if mimeType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" {
+		return "PowerPoint presentation"
+	}
+	if mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" {
+		return "Excel spreadsheet"
 	}
 	return "media file"
 }
