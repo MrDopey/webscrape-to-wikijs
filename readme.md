@@ -8,7 +8,9 @@ A comprehensive Go-based CLI tool for crawling Google Drive folders and converti
 - **Link Discovery**: Automatically follows links within documents (including PDFs) to discover referenced files (configurable depth)
 - **Deleted File Tracking**: Automatically indexes deleted/inaccessible files with "deleted" status for documentation tracking
 - **Conversion Mode**: Convert Google Drive documents to markdown with intelligent link rewriting and frontmatter
-- **Multiple File Types**: Supports Google Docs (native markdown export) and PDFs (Google Docs conversion + fallback text extraction)
+- **Multiple File Types**:
+  - Full conversion: Google Docs (native markdown export) and PDFs (Google Docs conversion + fallback text extraction)
+  - Stub documents: Google Forms, Sheets, Presentations, and media files (videos, audio, images, Excel, PowerPoint)
 - **Smart Link Rewriting**: Automatically converts absolute Google Drive links to relative markdown paths
 - **Hierarchical Organization**: Creates nested directory structures based on fragment columns
 - **YAML Frontmatter**: Generates metadata including hashes, tags, and publication status
@@ -208,11 +210,12 @@ docs/
 
 **Note**: Filenames are automatically normalized to lowercase with hyphens, while the document title in the frontmatter preserves the original formatting.
 
-**Generated Markdown File**:
+**Generated Markdown File (Full Conversion)**:
 ```markdown
 ---
 description: Getting Started
 editor: markdown
+gdrive-link: "https://docs.google.com/document/d/FILE_ID/edit"
 hash-gdrive: 2024-01-15T10:30:00.000Z
 hash-content: a1b2c3d4e5f6...
 published: true
@@ -220,9 +223,29 @@ tags: tutorial, beginner
 title: Getting Started
 ---
 
+> Link: https://docs.google.com/document/d/FILE_ID/edit
+
 # Getting Started
 
 [Link to API Reference](../../reference/api/api-reference.md)
+```
+
+**Generated Stub Document (Forms, Sheets, Media)**:
+```markdown
+---
+description: User Feedback Form
+editor: markdown
+gdrive-link: "https://docs.google.com/forms/d/e/FILE_ID/viewform"
+hash-gdrive: stub
+hash-content: a1b2c3d4e5f6...
+published: true
+tags: feedback
+title: User Feedback Form
+---
+
+> Link: https://docs.google.com/forms/d/e/FILE_ID/viewform
+
+*This is a Google Form. This document type cannot be exported to markdown format.*
 ```
 
 ### CLI Flags
@@ -411,11 +434,14 @@ Generated YAML frontmatter includes:
 
 - `description`: Document title
 - `editor`: Always set to "markdown"
-- `hash-gdrive`: Google Drive modification timestamp
+- `gdrive-link`: Original Google Drive URL
+- `hash-gdrive`: Google Drive modification timestamp (or "stub" for unsupported document types)
 - `hash-content`: SHA256 hash of markdown content
 - `published`: Always set to true
 - `tags`: Comma-separated tags from CSV
 - `title`: Document title
+
+**Note**: Stub documents (Forms, Sheets, Presentations, media files) will have `hash-gdrive: stub` since they cannot be exported for content comparison.
 
 ## Error Handling
 
@@ -463,7 +489,7 @@ The tool handles various error scenarios gracefully:
   - **Google Docs**: `https://docs.google.com/document/d/{ID}/edit`
   - **Google Sheets**: `https://docs.google.com/spreadsheets/d/{ID}/edit`
   - **Google Slides**: `https://docs.google.com/presentation/d/{ID}/edit`
-  - **Google Forms**: `https://docs.google.com/forms/d/{ID}/edit`
+  - **Google Forms**: `https://docs.google.com/forms/d/e/{ID}/viewform`
   - **Google Drawings**: `https://docs.google.com/drawings/d/{ID}/edit`
   - **Folders**: `https://drive.google.com/drive/folders/{ID}`
   - **Generic files**: `https://drive.google.com/file/d/{ID}/view`
@@ -485,11 +511,30 @@ The tool handles various error scenarios gracefully:
     - Run the tool again - it will prompt for authorization with the new scope
 - **Workaround**: The tool will automatically fall back to basic text extraction (lower quality) if conversion fails
 
-### "Unsupported file type"
-- Currently supported:
-  - Google Docs (native markdown export)
-  - PDFs (converted via Google Docs for better quality)
-- Other Google Workspace types (Sheets, Slides) require export format specification
+### Supported File Types
+
+The tool handles different file types in two ways:
+
+**Full Markdown Conversion:**
+- **Google Docs**: Native markdown export from Google Drive API
+- **PDFs**: Converted via "Open with Google Docs" for best quality, with fallback to text extraction
+- **Word Documents (.docx)**: Converted via "Open with Google Docs"
+
+**Stub Documents** (created with frontmatter and link, no content conversion):
+- **Google Forms**: Cannot be exported to markdown format
+- **Google Sheets**: Spreadsheet data cannot be meaningfully converted to markdown
+- **Google Presentations**: Slide decks cannot be exported to markdown format
+- **Video files**: video/mp4, video/quicktime, etc.
+- **Audio files**: audio/mpeg, audio/wav, etc.
+- **Image files**: image/jpeg, image/png, etc.
+- **Excel spreadsheets (.xlsx)**: Cannot be exported to markdown format
+- **PowerPoint presentations (.pptx)**: Cannot be exported to markdown format
+
+Stub documents include:
+- Full frontmatter with title, tags, and link to original
+- Preamble with original Google Drive URL
+- Note explaining why the document cannot be converted
+- `hash-gdrive: stub` to distinguish from converted documents
 
 ## Development
 
@@ -510,7 +555,7 @@ go build -o gdrive-crawler ./cmd/gdrive-crawler
 
 ## Roadmap
 
-- [ ] Support for Google Sheets → Markdown tables
+- [x] ~~Support for Google Sheets → Markdown tables~~ (Now handled as stub documents with links to originals)
 - [ ] Image asset downloading and local referencing
 - [ ] Incremental updates (only process changed documents)
 - [ ] Broken link validation
