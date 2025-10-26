@@ -182,7 +182,9 @@ func (d *Discoverer) discoverFolder(folderID string) ([]csv.DiscoveryRecord, err
 		call := d.service.Files.List().
 			Q(query).
 			Fields("nextPageToken, files(id, name, mimeType)").
-			PageSize(100)
+			PageSize(100).
+			SupportsAllDrives(true).
+			IncludeItemsFromAllDrives(true)
 
 		if pageToken != "" {
 			call.PageToken(pageToken)
@@ -241,6 +243,7 @@ func (d *Discoverer) getFileMetadata(fileID string) (*drive.File, error) {
 	file, err := d.executeFileWithRetry(func() (*drive.File, error) {
 		return d.service.Files.Get(fileID).
 			Fields("id, name, mimeType").
+			SupportsAllDrives(true).
 			Do()
 	})
 
@@ -396,14 +399,14 @@ func (d *Discoverer) extractLinksFromPDF(fileID string) ([]byte, error) {
 		MimeType: "application/vnd.google-apps.document",
 	}
 
-	copiedFile, err := d.service.Files.Copy(fileID, copyFile).Do()
+	copiedFile, err := d.service.Files.Copy(fileID, copyFile).SupportsAllDrives(true).Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert PDF to Google Docs: %w", err)
 	}
 
 	// Delete the temporary converted file when done
 	defer func() {
-		if err := d.service.Files.Delete(copiedFile.Id).Do(); err != nil {
+		if err := d.service.Files.Delete(copiedFile.Id).SupportsAllDrives(true).Do(); err != nil {
 			if d.verbose {
 				log.Printf("Warning: Failed to delete temporary file %s: %v", copiedFile.Id, err)
 			}

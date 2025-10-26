@@ -219,7 +219,7 @@ func (c *Converter) convertPDFViaGoogleDocs(fileID string, modifiedTime string) 
 		MimeType: "application/vnd.google-apps.document",
 	}
 
-	copiedFile, err := c.service.Files.Copy(fileID, copyFile).Do()
+	copiedFile, err := c.service.Files.Copy(fileID, copyFile).SupportsAllDrives(true).Do()
 	if err != nil {
 		if c.verbose {
 			log.Printf("Warning: Failed to convert PDF %s using Google Docs, falling back to text extraction: %v", fileID, err)
@@ -230,7 +230,7 @@ func (c *Converter) convertPDFViaGoogleDocs(fileID string, modifiedTime string) 
 
 	// Delete the temporary converted file when done
 	defer func() {
-		if err := c.service.Files.Delete(copiedFile.Id).Do(); err != nil {
+		if err := c.service.Files.Delete(copiedFile.Id).SupportsAllDrives(true).Do(); err != nil {
 			if c.verbose {
 				log.Printf("Warning: Failed to delete temporary file %s: %v", copiedFile.Id, err)
 			}
@@ -418,6 +418,7 @@ func (c *Converter) getFileMetadata(fileID string) (*drive.File, error) {
 	for i := 0; i < maxRetries; i++ {
 		file, err := c.service.Files.Get(fileID).
 			Fields("id, name, mimeType, modifiedTime").
+			SupportsAllDrives(true).
 			Do()
 
 		if err == nil {
@@ -442,6 +443,7 @@ func (c *Converter) getFileMetadata(fileID string) (*drive.File, error) {
 	// Final attempt
 	return c.service.Files.Get(fileID).
 		Fields("id, name, mimeType, modifiedTime").
+		SupportsAllDrives(true).
 		Do()
 }
 
@@ -486,7 +488,7 @@ func (c *Converter) executeDownloadWithRetry(fileID string) (io.ReadCloser, erro
 	baseDelay := time.Second
 
 	for i := 0; i < maxRetries; i++ {
-		resp, err := c.service.Files.Get(fileID).Download()
+		resp, err := c.service.Files.Get(fileID).SupportsAllDrives(true).Download()
 
 		if err == nil {
 			return resp.Body, nil
@@ -508,7 +510,7 @@ func (c *Converter) executeDownloadWithRetry(fileID string) (io.ReadCloser, erro
 	}
 
 	// Final attempt
-	resp, err := c.service.Files.Get(fileID).Download()
+	resp, err := c.service.Files.Get(fileID).SupportsAllDrives(true).Download()
 	if err != nil {
 		return nil, err
 	}
