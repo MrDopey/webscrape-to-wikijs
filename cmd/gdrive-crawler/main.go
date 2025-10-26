@@ -155,7 +155,7 @@ func runConvert() {
 	input := fs.String("input", "", "Input CSV file (required)")
 	output := fs.String("output", "./output", "Output directory path")
 	credentials := fs.String("credentials", "credentials.json", "Google API credentials JSON file (required)")
-	workers := fs.Int("workers", 5, "Number of concurrent workers")
+	workers := fs.Int("workers", 1, "Number of concurrent workers")
 	verbose := fs.Bool("verbose", false, "Enable verbose logging")
 	dryRun := fs.Bool("dry-run", false, "Preview actions without writing files")
 
