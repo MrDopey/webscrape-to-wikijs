@@ -256,13 +256,16 @@ func (s *Syncer) syncFile(filePath string) SyncResult {
 	// Rewrite links in new content
 	newContentStr := s.linkRewriter.RewriteLinks(string(newContent), record)
 
+	// Build content with preamble (matching convert behavior)
+	preamble := fmt.Sprintf("> Link: %s", gdriveLink)
+	contentWithPreamble := preamble + "\n\n" + newContentStr
+
 	// Update frontmatter
 	frontmatter["hash-gdrive"] = file.ModifiedTime
-	frontmatter["hash-content"] = utils.CalculateStringHash(newContentStr)
+	frontmatter["hash-content"] = utils.CalculateStringHash(contentWithPreamble)
 
 	// Reconstruct file
-	preamble := fmt.Sprintf("> Link: %s", gdriveLink)
-	finalContent := s.buildFrontmatter(frontmatter) + "\n" + preamble + "\n\n" + newContentStr
+	finalContent := s.buildFrontmatter(frontmatter) + "\n" + contentWithPreamble
 
 	result.ContentLength = len(finalContent)
 
