@@ -335,8 +335,33 @@ func convertPDFToMarkdown(pdfPath string) ([]byte, error) {
 	return []byte(sb.String()), nil
 }
 
+// normalizeMultilineURLs fixes Google Drive/Docs URLs that are broken across multiple lines
+// Example: "*https://docs.google.com/document/d/abc*\n*defg/edit*" -> "https://docs.google.com/document/d/abcdefg/edit"
+func normalizeMultilineURLs(content string) string {
+	// Pattern to match Google Drive URL that might continue on next line
+	// Captures: URL (without trailing markdown), then matches markdown/whitespace/newline, then captures continuation
+	// The [^\s\*_\n]+ ensures we don't capture markdown formatting or whitespace as part of the URL
+	urlContinuationPattern := regexp.MustCompile(
+		`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\*_\n]+)[\*_]?\s*\n\s*[\*_]?([^\s\*_\n]+)[\*_]?`,
+	)
+
+	// Keep replacing until no more matches (handles multi-line breaks)
+	for {
+		normalized := urlContinuationPattern.ReplaceAllString(content, "$1$2")
+		if normalized == content {
+			break
+		}
+		content = normalized
+	}
+
+	return content
+}
+
 // rewriteLinks rewrites Google Drive/Docs links to relative paths
 func (c *Converter) rewriteLinks(content string, sourceRecord *csv.ConversionRecord) string {
+	// Normalize content to fix URLs broken across multiple lines
+	content = normalizeMultilineURLs(content)
+
 	// Pattern to match Google Drive and Google Docs links
 	// Using non-capturing group (?:...) for domain alternation
 	linkPattern := regexp.MustCompile(`\[([^\]]+)\]\((https://(?:drive\.google\.com|docs\.google\.com)/[^\)]+)\)`)

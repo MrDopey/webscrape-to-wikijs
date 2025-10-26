@@ -312,6 +312,28 @@ func (d *Discoverer) executeFileWithRetry(fn func() (*drive.File, error)) (*driv
 	return fn() // Final attempt
 }
 
+// normalizeMultilineURLs fixes Google Drive/Docs URLs that are broken across multiple lines
+// Example: "*https://docs.google.com/document/d/abc*\n*defg/edit*" -> "https://docs.google.com/document/d/abcdefg/edit"
+func normalizeMultilineURLs(content string) string {
+	// Pattern to match Google Drive URL that might continue on next line
+	// Captures: URL (without trailing markdown), then matches markdown/whitespace/newline, then captures continuation
+	// The [^\s\*_\n]+ ensures we don't capture markdown formatting or whitespace as part of the URL
+	urlContinuationPattern := regexp.MustCompile(
+		`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\*_\n]+)[\*_]?\s*\n\s*[\*_]?([^\s\*_\n]+)[\*_]?`,
+	)
+
+	// Keep replacing until no more matches (handles multi-line breaks)
+	for {
+		normalized := urlContinuationPattern.ReplaceAllString(content, "$1$2")
+		if normalized == content {
+			break
+		}
+		content = normalized
+	}
+
+	return content
+}
+
 // extractLinksFromDocument exports a document and extracts Google Drive/Docs URLs
 func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string {
 	var linkedURLs []string
@@ -356,10 +378,13 @@ func (d *Discoverer) extractLinksFromDocument(fileID, mimeType string) []string 
 		return linkedURLs
 	}
 
+	// Normalize content to fix URLs broken across multiple lines
+	normalizedContent := normalizeMultilineURLs(string(content))
+
 	// Find all Google Drive/Docs URLs in the content
 	// Pattern matches both drive.google.com and docs.google.com URLs
 	linkPattern := regexp.MustCompile(`https://(?:drive\.google\.com|docs\.google\.com)/[^\s\)]+`)
-	matches := linkPattern.FindAllString(string(content), -1)
+	matches := linkPattern.FindAllString(normalizedContent, -1)
 
 	// Process URLs and preserve them
 	for _, urlStr := range matches {
@@ -434,6 +459,7 @@ func (d *Discoverer) extractLinksFromPDF(fileID string) ([]byte, error) {
 
 // extractFileID extracts the file/folder ID from a Google Drive URL
 func extractFileID(urlStr string) (string, error) {
+	log.Printf("{%s}", urlStr)
 	// Parse URL
 	u, err := url.Parse(urlStr)
 	if err != nil {
