@@ -70,6 +70,9 @@ func (c *Converter) Convert(records []csv.ConversionRecord, workers int) error {
 			defer wg.Done()
 			for record := range jobs {
 				err := c.convertRecord(record)
+				if err != nil {
+					log.Printf("Erorr: %s", err)
+				}
 				results <- err
 			}
 		}()
