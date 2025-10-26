@@ -71,7 +71,7 @@ func (c *Converter) Convert(records []csv.ConversionRecord, workers int) error {
 			for record := range jobs {
 				err := c.convertRecord(record)
 				if err != nil {
-					log.Printf("Erorr: %s", err)
+					log.Printf("Error: %s", err)
 				}
 				results <- err
 			}
