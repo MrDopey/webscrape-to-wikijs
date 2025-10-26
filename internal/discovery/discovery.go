@@ -469,7 +469,7 @@ func (d *Discoverer) extractLinksFromPDF(fileID string) ([]byte, error) {
 
 // extractFileID extracts the file/folder ID from a Google Drive URL
 func extractFileID(urlStr string) (string, error) {
-	log.Printf("{%s}", urlStr)
+	log.Printf("Extracting file id from: %s", urlStr)
 	// Parse URL
 	u, err := url.Parse(urlStr)
 	if err != nil {
