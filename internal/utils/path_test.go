@@ -210,3 +210,60 @@ func TestEnsureUniquePath(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeFilename(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		want     string
+	}{
+		{
+			name:     "simple filename",
+			filename: "Getting Started",
+			want:     "getting-started",
+		},
+		{
+			name:     "filename with special characters",
+			filename: "API Reference: v2.0!",
+			want:     "api-reference-v2",
+		},
+		{
+			name:     "filename with multiple spaces",
+			filename: "User   Guide    2024",
+			want:     "user-guide-2024",
+		},
+		{
+			name:     "filename with underscores",
+			filename: "test_file_name",
+			want:     "testfilename",
+		},
+		{
+			name:     "filename with extension",
+			filename: "document.md",
+			want:     "document",
+		},
+		{
+			name:     "filename with leading/trailing hyphens",
+			filename: "--test--",
+			want:     "test",
+		},
+		{
+			name:     "empty after normalization",
+			filename: "!@#$%",
+			want:     "unnamed",
+		},
+		{
+			name:     "uppercase with numbers",
+			filename: "Section-5A",
+			want:     "section-5a",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NormalizeFilename(tt.filename); got != tt.want {
+				t.Errorf("NormalizeFilename() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

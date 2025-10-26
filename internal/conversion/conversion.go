@@ -164,7 +164,7 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 	finalContent := frontmatter + "\n" + contentStr
 
 	// Build output path with normalized filename
-	normalizedTitle := normalizeFilename(record.Title)
+	normalizedTitle := utils.NormalizeFilename(record.Title)
 	outputPath := utils.BuildOutputPath(c.outputDir, normalizedTitle, record.GetFragments())
 
 	// Ensure unique path
@@ -293,7 +293,7 @@ func (c *Converter) writeStubDocument(record *csv.ConversionRecord, contentStr s
 	finalContent := frontmatter + "\n" + contentStr
 
 	// Build output path with normalized filename
-	normalizedTitle := normalizeFilename(record.Title)
+	normalizedTitle := utils.NormalizeFilename(record.Title)
 	outputPath := utils.BuildOutputPath(c.outputDir, normalizedTitle, record.GetFragments())
 
 	// Ensure unique path
@@ -516,7 +516,7 @@ func (c *Converter) rewriteLinks(content string, sourceRecord *csv.ConversionRec
 		}
 
 		// Calculate relative path with normalized filename
-		normalizedTargetTitle := normalizeFilename(targetRecord.Title)
+		normalizedTargetTitle := utils.NormalizeFilename(targetRecord.Title)
 		relPath := utils.CalculateRelativePath(
 			sourceRecord.GetFragments(),
 			targetRecord.GetFragments(),
@@ -687,43 +687,5 @@ func (c *Converter) executeDownloadWithRetry(fileID string) (io.ReadCloser, erro
 		return nil, err
 	}
 	return resp.Body, nil
-}
-
-// normalizeFilename normalizes a filename to be lowercase, hyphenated, and without special characters
-func normalizeFilename(filename string) string {
-	// Strip file extension if present
-	if idx := strings.LastIndex(filename, "."); idx != -1 {
-		filename = filename[:idx]
-	}
-
-	// Convert to lowercase
-	filename = strings.ToLower(filename)
-
-	// Replace spaces with hyphens
-	filename = strings.ReplaceAll(filename, " ", "-")
-
-	// Remove special characters, keeping only alphanumeric and hyphens
-	var sb strings.Builder
-	for _, r := range filename {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
-			sb.WriteRune(r)
-		}
-	}
-	filename = sb.String()
-
-	// Replace multiple consecutive hyphens with a single hyphen
-	for strings.Contains(filename, "--") {
-		filename = strings.ReplaceAll(filename, "--", "-")
-	}
-
-	// Trim hyphens from start and end
-	filename = strings.Trim(filename, "-")
-
-	// If filename is empty after normalization, use a default
-	if filename == "" {
-		filename = "unnamed"
-	}
-
-	return filename
 }
 

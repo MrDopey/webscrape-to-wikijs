@@ -125,3 +125,41 @@ func EnsureUniquePath(path string, existingPaths map[string]bool) string {
 		}
 	}
 }
+
+// NormalizeFilename normalizes a filename to be lowercase, hyphenated, and without special characters
+func NormalizeFilename(filename string) string {
+	// Strip file extension if present
+	if idx := strings.LastIndex(filename, "."); idx != -1 {
+		filename = filename[:idx]
+	}
+
+	// Convert to lowercase
+	filename = strings.ToLower(filename)
+
+	// Replace spaces with hyphens
+	filename = strings.ReplaceAll(filename, " ", "-")
+
+	// Remove special characters, keeping only alphanumeric and hyphens
+	var sb strings.Builder
+	for _, r := range filename {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			sb.WriteRune(r)
+		}
+	}
+	filename = sb.String()
+
+	// Replace multiple consecutive hyphens with a single hyphen
+	for strings.Contains(filename, "--") {
+		filename = strings.ReplaceAll(filename, "--", "-")
+	}
+
+	// Trim hyphens from start and end
+	filename = strings.Trim(filename, "-")
+
+	// If filename is empty after normalization, use a default
+	if filename == "" {
+		filename = "unnamed"
+	}
+
+	return filename
+}
