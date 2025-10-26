@@ -12,6 +12,7 @@ webscrape-to-wikijs
 
 # Output directories
 output/
+output-single/
 docs/
 documentation/
 inputs/

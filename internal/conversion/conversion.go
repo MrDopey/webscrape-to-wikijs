@@ -141,7 +141,8 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 
 	// Rewrite links in content
 	contentStr := string(content)
-	contentStr = c.rewriteLinks(contentStr, record)
+	preamble := c.preamble(record)
+	contentStr = preamble + "\n" + c.rewriteLinks(contentStr, record)
 
 	// Generate frontmatter
 	frontmatter := c.generateFrontmatter(record, revisionHash, contentStr)
@@ -365,6 +366,10 @@ func normalizeMultilineURLs(content string) string {
 	})
 
 	return content
+}
+
+func (c *Converter) preamble(sourceRecord *csv.ConversionRecord) string {
+	return fmt.Sprintf("> Link: %s", sourceRecord.Link)
 }
 
 // rewriteLinks rewrites Google Drive/Docs links to relative paths
