@@ -336,13 +336,16 @@ func convertPDFToMarkdown(pdfPath string) ([]byte, error) {
 }
 
 // normalizeMultilineURLs fixes Google Drive/Docs URLs that are broken across multiple lines
+// and unescapes markdown characters within URLs
 // Example: "*https://docs.google.com/document/d/abc*\n*defg/edit*" -> "https://docs.google.com/document/d/abcdefg/edit"
+// Example: "https://docs.google.com/document/d/abc\_def/edit" -> "https://docs.google.com/document/d/abc_def/edit"
 func normalizeMultilineURLs(content string) string {
+	// Step 1: Fix URLs broken across multiple lines FIRST (before unescaping)
 	// Pattern to match Google Drive URL that might continue on next line
-	// Captures: URL (without trailing markdown), then matches markdown/whitespace/newline, then captures continuation
-	// The [^\s\*_\n]+ ensures we don't capture markdown formatting or whitespace as part of the URL
+	// Uses [^\s\n]+? (non-greedy) to allow underscores, backslashes, etc in URLs
+	// Explicitly matches and strips markdown markers (*/_) around the line break
 	urlContinuationPattern := regexp.MustCompile(
-		`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\*_\n]+)[\*_]?\s*\n\s*[\*_]?([^\s\*_\n]+)[\*_]?`,
+		`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\n]+?)[\*_]*\s*\n\s*[\*_]*([^\s\n]+?)[\*_]*`,
 	)
 
 	// Keep replacing until no more matches (handles multi-line breaks)
@@ -353,6 +356,20 @@ func normalizeMultilineURLs(content string) string {
 		}
 		content = normalized
 	}
+
+	// Step 2: Unescape markdown characters within Google Drive URLs
+	// This handles cases like \_  \*  etc. that are escaped in markdown
+	// Do this AFTER joining lines so we unescape the complete URL
+	escapedCharsPattern := regexp.MustCompile(`(https://(?:drive\.google\.com|docs\.google\.com)/[^\s\n]*)`)
+	content = escapedCharsPattern.ReplaceAllStringFunc(content, func(url string) string {
+		// Remove backslash escapes from common markdown characters
+		url = strings.ReplaceAll(url, `\_`, `_`)
+		url = strings.ReplaceAll(url, `\*`, `*`)
+		url = strings.ReplaceAll(url, `\-`, `-`)
+		url = strings.ReplaceAll(url, `\[`, `[`)
+		url = strings.ReplaceAll(url, `\]`, `]`)
+		return url
+	})
 
 	return content
 }
