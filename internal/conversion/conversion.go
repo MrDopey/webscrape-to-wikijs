@@ -127,6 +127,11 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 		return fmt.Errorf("failed to get metadata for %s: %w", fileID, err)
 	}
 
+	// Check if this is a video file or other unsupported media type - handle as stub
+	if c.isUnsupportedMediaType(file.MimeType) {
+		return c.convertStubDocumentWithMimeType(record, file.MimeType)
+	}
+
 	// Download content based on mime type
 	var content []byte
 	var revisionHash string
@@ -197,6 +202,13 @@ func (c *Converter) requiresStubConversion(urlStr string) bool {
 		strings.Contains(urlStr, "docs.google.com/spreadsheets")
 }
 
+// isUnsupportedMediaType checks if a MIME type cannot be converted to markdown
+func (c *Converter) isUnsupportedMediaType(mimeType string) bool {
+	return strings.HasPrefix(mimeType, "video/") ||
+		strings.HasPrefix(mimeType, "audio/") ||
+		strings.HasPrefix(mimeType, "image/")
+}
+
 // getDocumentType returns a human-readable type for stub documents
 func (c *Converter) getDocumentType(urlStr string) string {
 	if strings.Contains(urlStr, "docs.google.com/forms") {
@@ -206,6 +218,20 @@ func (c *Converter) getDocumentType(urlStr string) string {
 		return "Google Sheet"
 	}
 	return "Google Document"
+}
+
+// getDocumentTypeFromMimeType returns a human-readable type based on MIME type
+func (c *Converter) getDocumentTypeFromMimeType(mimeType string) string {
+	if strings.HasPrefix(mimeType, "video/") {
+		return "video file"
+	}
+	if strings.HasPrefix(mimeType, "audio/") {
+		return "audio file"
+	}
+	if strings.HasPrefix(mimeType, "image/") {
+		return "image file"
+	}
+	return "media file"
 }
 
 // convertStubDocument creates a stub document for unsupported document types (Forms, Sheets, etc.)
@@ -220,6 +246,26 @@ func (c *Converter) convertStubDocument(record *csv.ConversionRecord) error {
 	preamble := c.preamble(record)
 	contentStr := fmt.Sprintf("%s\n\n*This is a %s. This document type cannot be exported to markdown format.*", preamble, docType)
 
+	return c.writeStubDocument(record, contentStr)
+}
+
+// convertStubDocumentWithMimeType creates a stub document for unsupported media types
+func (c *Converter) convertStubDocumentWithMimeType(record *csv.ConversionRecord, mimeType string) error {
+	docType := c.getDocumentTypeFromMimeType(mimeType)
+
+	if c.verbose {
+		log.Printf("Creating stub for %s (%s): %s", docType, mimeType, record.Title)
+	}
+
+	// Create stub content with just the preamble
+	preamble := c.preamble(record)
+	contentStr := fmt.Sprintf("%s\n\n*This is a %s (%s). Media files cannot be exported to markdown format.*", preamble, docType, mimeType)
+
+	return c.writeStubDocument(record, contentStr)
+}
+
+// writeStubDocument writes a stub document to disk
+func (c *Converter) writeStubDocument(record *csv.ConversionRecord, contentStr string) error {
 	// Generate frontmatter with stub hash
 	frontmatter := c.generateFrontmatterStub(record, contentStr)
 
