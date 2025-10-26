@@ -116,9 +116,9 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 		return fmt.Errorf("failed to extract file ID from %s: %w", record.Link, err)
 	}
 
-	// Check if this is a Google Form - handle as special case
-	if c.isGoogleForm(record.Link) {
-		return c.convertGoogleForm(record)
+	// Check if this is a Google Form or Sheet - handle as special case
+	if c.requiresStubConversion(record.Link) {
+		return c.convertStubDocument(record)
 	}
 
 	// Get file metadata
@@ -191,20 +191,34 @@ func (c *Converter) convertRecord(record *csv.ConversionRecord) error {
 	return nil
 }
 
-// isGoogleForm checks if a URL is a Google Form
-func (c *Converter) isGoogleForm(urlStr string) bool {
-	return strings.Contains(urlStr, "docs.google.com/forms")
+// requiresStubConversion checks if a URL is for a document type that cannot be converted to markdown
+func (c *Converter) requiresStubConversion(urlStr string) bool {
+	return strings.Contains(urlStr, "docs.google.com/forms") ||
+		strings.Contains(urlStr, "docs.google.com/spreadsheets")
 }
 
-// convertGoogleForm creates a stub document for a Google Form
-func (c *Converter) convertGoogleForm(record *csv.ConversionRecord) error {
+// getDocumentType returns a human-readable type for stub documents
+func (c *Converter) getDocumentType(urlStr string) string {
+	if strings.Contains(urlStr, "docs.google.com/forms") {
+		return "Google Form"
+	}
+	if strings.Contains(urlStr, "docs.google.com/spreadsheets") {
+		return "Google Sheet"
+	}
+	return "Google Document"
+}
+
+// convertStubDocument creates a stub document for unsupported document types (Forms, Sheets, etc.)
+func (c *Converter) convertStubDocument(record *csv.ConversionRecord) error {
+	docType := c.getDocumentType(record.Link)
+
 	if c.verbose {
-		log.Printf("Creating stub for Google Form: %s", record.Title)
+		log.Printf("Creating stub for %s: %s", docType, record.Title)
 	}
 
 	// Create stub content with just the preamble
 	preamble := c.preamble(record)
-	contentStr := preamble + "\n\n*This is a Google Form. Forms cannot be exported to markdown format.*"
+	contentStr := fmt.Sprintf("%s\n\n*This is a %s. This document type cannot be exported to markdown format.*", preamble, docType)
 
 	// Generate frontmatter with stub hash
 	frontmatter := c.generateFrontmatterStub(record, contentStr)
