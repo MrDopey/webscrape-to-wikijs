@@ -166,7 +166,7 @@ func (r *ConversionRecord) GetTagsList() []string {
 		return nil
 	}
 	var tags []string
-	for _, tag := range strings.Split(r.Tags, ",") {
+	for _, tag := range strings.Split(r.Tags, ";") {
 		tag = strings.TrimSpace(tag)
 		if tag != "" {
 			tags = append(tags, tag)
