@@ -419,6 +419,7 @@ func (c *Converter) generateFrontmatter(record *csv.ConversionRecord, revisionHa
 	sb.WriteString("---\n")
 	sb.WriteString(fmt.Sprintf("description: %s\n", escapeYAML(record.Title)))
 	sb.WriteString("editor: markdown\n")
+	sb.WriteString(fmt.Sprintf("gdrive-link: %s\n", escapeYAML(record.Link)))
 	sb.WriteString(fmt.Sprintf("hash-gdrive: %s\n", escapeYAML(revisionHash)))
 	sb.WriteString(fmt.Sprintf("hash-content: %s\n", utils.CalculateStringHash(content)))
 	sb.WriteString("published: true\n")
