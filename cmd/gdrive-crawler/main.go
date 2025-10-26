@@ -11,6 +11,7 @@ import (
 	"github.com/yourusername/webscrape-to-wikijs/internal/conversion"
 	csvpkg "github.com/yourusername/webscrape-to-wikijs/internal/csv"
 	"github.com/yourusername/webscrape-to-wikijs/internal/discovery"
+	"github.com/yourusername/webscrape-to-wikijs/internal/sync"
 )
 
 const (
@@ -22,6 +23,7 @@ Usage:
 Commands:
   discover   Discover files in Google Drive folders and output CSV
   convert    Convert Google Drive documents to markdown
+  sync       Sync existing markdown files with Google Drive updates
 
 Discover Flags:
   -input string
@@ -49,12 +51,29 @@ Convert Flags:
   -dry-run
         Preview actions without writing files
 
+Sync Flags:
+  -input string
+        Input CSV file with link, title, tags, frag1-5 columns (required)
+  -output string
+        Output directory path containing existing markdown files (default: ./output)
+  -credentials string
+        Google API credentials JSON file (required)
+  -workers int
+        Number of concurrent workers (default: 5)
+  -verbose
+        Enable verbose logging
+  -dry-run
+        Preview actions without writing files
+
 Examples:
   # Discover files
   gdrive-crawler discover -input folders.csv -output links.csv -credentials creds.json
 
   # Convert documents
   gdrive-crawler convert -input enhanced-links.csv -output ./docs -credentials creds.json -workers 10
+
+  # Sync existing documents with Google Drive
+  gdrive-crawler sync -input enhanced-links.csv -output ./docs -credentials creds.json -workers 10
 `
 )
 
@@ -71,6 +90,8 @@ func main() {
 		runDiscover()
 	case "convert":
 		runConvert()
+	case "sync":
+		runSync()
 	case "help", "-h", "--help":
 		fmt.Print(usageMessage)
 	default:
@@ -204,5 +225,89 @@ func runConvert() {
 		log.Println("Dry run completed successfully")
 	} else {
 		log.Printf("Successfully converted %d documents to %s", len(records), *output)
+	}
+}
+
+func runSync() {
+	fs := flag.NewFlagSet("sync", flag.ExitOnError)
+	input := fs.String("input", "", "Input CSV file (required)")
+	output := fs.String("output", "./output", "Output directory path")
+	credentials := fs.String("credentials", "credentials.json", "Google API credentials JSON file (required)")
+	workers := fs.Int("workers", 1, "Number of concurrent workers")
+	verbose := fs.Bool("verbose", false, "Enable verbose logging")
+	dryRun := fs.Bool("dry-run", false, "Preview actions without writing files")
+
+	fs.Parse(os.Args[2:])
+
+	// Validate required flags
+	if *input == "" || *credentials == "" {
+		fmt.Println("Error: -input and -credentials are required")
+		fs.PrintDefaults()
+		os.Exit(1)
+	}
+
+	// Create context
+	ctx := context.Background()
+
+	// Authenticate
+	if *verbose {
+		log.Println("Authenticating with Google Drive API...")
+	}
+	driveService, err := auth.NewDriveService(ctx, *credentials)
+	if err != nil {
+		log.Fatalf("Failed to authenticate: %v", err)
+	}
+
+	// Parse input CSV
+	if *verbose {
+		log.Printf("Reading input from %s...", *input)
+	}
+	records, err := csvpkg.ParseConversionCSV(*input)
+	if err != nil {
+		log.Fatalf("Failed to parse input CSV: %v", err)
+	}
+
+	if *verbose {
+		log.Printf("Found %d records in CSV for link mapping", len(records))
+	}
+
+	// Sync documents
+	syncer := sync.NewSyncer(driveService.Service, *output, *verbose, *dryRun)
+	results, err := syncer.Sync(records, *workers)
+	if err != nil {
+		log.Printf("Sync completed with errors: %v", err)
+		os.Exit(1)
+	}
+
+	// Report results
+	updated := 0
+	unchanged := 0
+	errors := 0
+	skipped := 0
+
+	for _, result := range results {
+		switch result.Status {
+		case "updated":
+			updated++
+		case "unchanged":
+			unchanged++
+		case "error":
+			errors++
+			if *verbose {
+				log.Printf("Error syncing %s: %v", result.FilePath, result.Error)
+			}
+		case "skipped":
+			skipped++
+		}
+	}
+
+	if *dryRun {
+		log.Printf("Dry run completed: %d would be updated, %d unchanged, %d skipped, %d errors", updated, unchanged, skipped, errors)
+	} else {
+		log.Printf("Sync completed: %d updated, %d unchanged, %d skipped, %d errors", updated, unchanged, skipped, errors)
+	}
+
+	if errors > 0 {
+		os.Exit(1)
 	}
 }
